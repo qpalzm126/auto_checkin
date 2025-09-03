@@ -1,0 +1,40 @@
+name: Auto Check-in
+
+on:
+  schedule:
+    - cron: "45 0 * * 1-5"   # 08:45 上班打卡
+    - cron: "0 4 * * 1-5"    # 12:00 午休下班
+    - cron: "0 5 * * 1-5"    # 13:00 午休上班
+    - cron: "46 9 * * 1-5"   # 17:46 下班打卡
+  workflow_dispatch:
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run auto checkin
+        env:
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          LOGIN_URL: ${{ secrets.LOGIN_URL }}
+          AUTO_CHECKIN_ENABLED: ${{ secrets.AUTO_CHECKIN_ENABLED }}
+          SKIP_DATES: ${{ secrets.SKIP_DATES }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: |
+          python main.py
