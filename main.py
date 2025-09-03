@@ -67,7 +67,16 @@ def is_skip_today():
 
 # --- 抓今日 Check in ---
 def get_today_check_in(driver):
-    today_str = datetime.datetime.now().strftime("%m/%d")
+    # 在 GitHub Actions 環境中，使用台灣時間來匹配打卡系統的日期
+    if os.getenv("GITHUB_ACTIONS"):
+        # 台灣時間 = UTC + 8 小時
+        taiwan_time = datetime.datetime.now() + datetime.timedelta(hours=8)
+        today_str = taiwan_time.strftime("%m/%d")
+        print(f"🌏 使用台灣時間日期: {today_str}")
+    else:
+        today_str = datetime.datetime.now().strftime("%m/%d")
+        print(f"🕐 使用本地時間日期: {today_str}")
+    
     try:
         print(f"🔍 正在尋找今日上班時間，日期: {today_str}")
         
@@ -151,7 +160,16 @@ def get_today_check_in(driver):
 # --- 獲取當天打卡記錄 ---
 def get_today_attendance_records(driver):
     """獲取當天的完整打卡記錄"""
-    today_str = datetime.datetime.now().strftime("%m/%d")
+    # 在 GitHub Actions 環境中，使用台灣時間來匹配打卡系統的日期
+    if os.getenv("GITHUB_ACTIONS"):
+        # 台灣時間 = UTC + 8 小時
+        taiwan_time = datetime.datetime.now() + datetime.timedelta(hours=8)
+        today_str = taiwan_time.strftime("%m/%d")
+        print(f"🌏 使用台灣時間日期: {today_str}")
+    else:
+        today_str = datetime.datetime.now().strftime("%m/%d")
+        print(f"🕐 使用本地時間日期: {today_str}")
+    
     records = []
     
     try:
@@ -271,7 +289,13 @@ def punch_in(label=""):
                 today_date = datetime.datetime.now().date()
                 check_in_time = datetime.datetime.strptime(check_in_time_str, "%H:%M").time()
                 work_start_time = datetime.datetime.combine(today_date, check_in_time)
-                print(f"🕘 使用當天第一筆打卡記錄作為上班時間: {work_start_time}")
+                
+                # 檢查是否在 GitHub Actions 環境中
+                if os.getenv("GITHUB_ACTIONS"):
+                    print(f"🕘 使用當天第一筆打卡記錄作為上班時間 (台灣時間): {work_start_time}")
+                    print(f"ℹ️ 打卡系統顯示台灣時間，工時計算將基於台灣時間")
+                else:
+                    print(f"🕘 使用當天第一筆打卡記錄作為上班時間: {work_start_time}")
             except Exception as e:
                 print(f"⚠️ 解析第一筆打卡時間失敗: {e}")
                 # 如果解析失敗，使用備用方法
@@ -486,7 +510,13 @@ def test_attendance_records():
                     today_date = datetime.datetime.now().date()
                     check_in_time = datetime.datetime.strptime(check_in_time_str, "%H:%M").time()
                     work_start = datetime.datetime.combine(today_date, check_in_time)
-                    print(f"🕘 使用當天第一筆打卡記錄作為上班時間: {work_start}")
+                    
+                    # 檢查是否在 GitHub Actions 環境中
+                    if os.getenv("GITHUB_ACTIONS"):
+                        print(f"🕘 使用當天第一筆打卡記錄作為上班時間 (台灣時間): {work_start}")
+                        print(f"ℹ️ 打卡系統顯示台灣時間，工時計算將基於台灣時間")
+                    else:
+                        print(f"🕘 使用當天第一筆打卡記錄作為上班時間: {work_start}")
                 except Exception as e:
                     print(f"⚠️ 解析第一筆打卡時間失敗: {e}")
                     work_start = get_today_check_in(driver)
@@ -559,6 +589,47 @@ if __name__ == "__main__":
         print("   - 使用 'python main.py test' 來測試打卡記錄解析")
         print("   - 使用 'python main.py debug' 來調試 HTML 結構")
         
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
+        # 顯示當前時間資訊
+        current_time = datetime.datetime.now()
+        print(f"🕐 當前本地時間: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        if os.getenv("GITHUB_ACTIONS"):
+            taiwan_time = current_time + datetime.timedelta(hours=8)
+            print(f"🌏 對應台灣時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        else:
+            print("💻 本地環境，使用本地時間")
+        
+        # 檢查是否在 GitHub Actions 環境中
+        if os.getenv("GITHUB_ACTIONS"):
+            print("🤖 檢測到 GitHub Actions 環境，執行單次打卡檢查...")
+            current_time = datetime.datetime.now().strftime("%H:%M")
+            print(f"⏰ 當前時間 (UTC): {current_time}")
+            
+            # 根據當前時間判斷應該執行哪個打卡動作（UTC 時間）
+            # 台灣時間 08:45 = UTC 00:45
+            if current_time >= "00:40" and current_time <= "00:50":
+                print("🕘 執行上班打卡 (台灣時間 08:45)")
+                punch_in("上班")
+            # 台灣時間 12:00 = UTC 04:00
+            elif current_time >= "03:55" and current_time <= "04:05":
+                print("🕘 執行午休下班打卡 (台灣時間 12:00)")
+                punch_in("午休下班")
+            # 台灣時間 13:00 = UTC 05:00
+            elif current_time >= "04:55" and current_time <= "05:05":
+                print("🕘 執行午休上班打卡 (台灣時間 13:00)")
+                punch_in("午休上班")
+            # 台灣時間 17:46 = UTC 09:46
+            elif current_time >= "09:40" and current_time <= "09:50":
+                print("🕘 執行下班打卡 (台灣時間 17:46)")
+                punch_in("下班")
+            else:
+                print(f"⏸ 當前時間 {current_time} UTC 不在打卡時間範圍內")
+                print("📅 打卡時間表:")
+                print("   - 上班: 00:40-00:50 UTC (台灣 08:40-08:50)")
+                print("   - 午休下班: 03:55-04:05 UTC (台灣 11:55-12:05)")
+                print("   - 午休上班: 04:55-05:05 UTC (台灣 12:55-13:05)")
+                print("   - 下班: 09:40-09:50 UTC (台灣 17:40-17:50)")
+        else:
+            print("💻 本地環境，啟動排程模式...")
+            while True:
+                schedule.run_pending()
+                time.sleep(1)
