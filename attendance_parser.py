@@ -26,29 +26,29 @@ class AttendanceParser:
         try:
             print(f"🔍 正在尋找今日上班時間，日期: {today_str}")
             
-            # 方法1: 尋找包含今日日期的 div
-            try:
-                date_div = driver.find_element(By.XPATH, f"//div[contains(text(), '{today_str}')]")
-                print(f"✅ 找到日期 div: {date_div.text}")
+            # # 方法1: 尋找包含今日日期的 div
+            # try:
+            #     date_div = driver.find_element(By.XPATH, f"//div[contains(text(), '{today_str}')]")
+            #     print(f"✅ 找到日期 div: {date_div.text}")
                 
-                # 找到包含這個日期的容器
-                container = date_div.find_element(By.XPATH, "./ancestor::div[contains(@class,'border') and contains(@class,'px-3')]")
-                print(f"✅ 找到日期容器")
+            #     # 找到包含這個日期的容器
+            #     container = date_div.find_element(By.XPATH, "./ancestor::div[contains(@class,'border') and contains(@class,'px-3')]")
+            #     print(f"✅ 找到日期容器")
                 
-            except Exception as e:
-                print(f"⚠️ 方法1失敗: {e}")
+            # except Exception as e:
+            #     print(f"⚠️ 方法1失敗: {e}")
                 # 方法2: 直接尋找包含日期的容器
-                try:
-                    container = driver.find_element(By.XPATH, f"//div[contains(@class,'border') and contains(@class,'px-3') and .//div[contains(text(), '{today_str}')]]")
-                    print(f"✅ 方法2找到日期容器")
-                except Exception as e2:
-                    print(f"❌ 方法2也失敗: {e2}")
-                    # 如果找不到今日記錄，使用預設時間
-                    today_date = datetime.datetime.now().date()
-                    fallback_time = datetime.time(hour=9, minute=0)
-                    work_start = datetime.datetime.combine(today_date, fallback_time)
-                    print(f"⚠️ 找不到今日記錄，備用方法使用預設上班時間: {work_start}")
-                    return work_start
+            try:
+                container = driver.find_element(By.XPATH, f"//div[contains(@class,'border') and contains(@class,'px-3') and .//div[contains(text(), '{today_str}')]]")
+                print(f"✅ 方法2找到日期容器")
+            except Exception as e2:
+                print(f"❌ 方法2也失敗: {e2}")
+                # 如果找不到今日記錄，使用預設時間
+                today_date = datetime.datetime.now().date()
+                fallback_time = datetime.time(hour=9, minute=0)
+                work_start = datetime.datetime.combine(today_date, fallback_time)
+                print(f"⚠️ 找不到今日記錄，備用方法使用預設上班時間: {work_start}")
+                return work_start
             
             # 方法3: 使用正則表達式從容器文本中提取第一個時間（排除時區區域）
             try:
@@ -167,23 +167,23 @@ class AttendanceParser:
             print(f"🔍 正在尋找日期: {today_str}")
             
             # 方法1: 尋找包含今日日期的 div
+            # try:
+            #     date_div = driver.find_element(By.XPATH, f"//div[contains(text(), '{today_str}')]")
+            #     print(f"✅ 找到日期 div: {date_div.text}")
+                
+            #     # 找到包含這個日期的容器
+            #     container = date_div.find_element(By.XPATH, "./ancestor::div[contains(@class,'border') and contains(@class,'px-3')]")
+            #     print(f"✅ 找到日期容器")
+                
+            # except Exception as e:
+            #     print(f"⚠️ 方法1失敗: {e}")
+            #     # 方法2: 直接尋找包含日期的容器
             try:
-                date_div = driver.find_element(By.XPATH, f"//div[contains(text(), '{today_str}')]")
-                print(f"✅ 找到日期 div: {date_div.text}")
-                
-                # 找到包含這個日期的容器
-                container = date_div.find_element(By.XPATH, "./ancestor::div[contains(@class,'border') and contains(@class,'px-3')]")
-                print(f"✅ 找到日期容器")
-                
-            except Exception as e:
-                print(f"⚠️ 方法1失敗: {e}")
-                # 方法2: 直接尋找包含日期的容器
-                try:
-                    container = driver.find_element(By.XPATH, f"//div[contains(@class,'border') and contains(@class,'px-3') and .//div[contains(text(), '{today_str}')]]")
-                    print(f"✅ 方法2找到日期容器")
-                except Exception as e2:
-                    print(f"❌ 方法2也失敗: {e2}")
-                    return []
+                container = driver.find_element(By.XPATH, f"//div[contains(@class,'border') and contains(@class,'px-3') and .//div[contains(text(), '{today_str}')]]")
+                print(f"✅ 方法2找到日期容器")
+            except Exception as e2:
+                print(f"❌ 方法2也失敗: {e2}")
+                return []
             
             # 尋找所有打卡記錄行（排除標題行）
             rows = container.find_elements(By.XPATH, ".//div[contains(@class,'row') and contains(@class,'border-bottom') and contains(@class,'hover-bg-primary-light')]")
