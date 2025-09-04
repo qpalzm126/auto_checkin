@@ -1,0 +1,31 @@
+name: Keep Repository Active
+
+on:
+  schedule:
+    # 每 30 天執行一次，確保 repository 保持活躍
+    - cron: "0 0 1 * *"
+  workflow_dispatch: # 手動觸發
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update last activity timestamp
+        run: |
+          echo "# Repository Activity Log" > activity.log
+          echo "Last activity: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> activity.log
+          echo "Purpose: Keep repository active to prevent scheduled workflows from being disabled" >> activity.log
+
+      - name: Commit activity log
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add activity.log
+          git commit -m "📅 Keep repository active - $(date -u '+%Y-%m-%d')" || exit 0
+          git push

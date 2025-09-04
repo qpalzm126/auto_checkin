@@ -51,12 +51,6 @@ class WebAutomation:
                     print("✅ 登入成功 - 找到打卡按鈕")
                     return True
                 
-                # 檢查是否有其他登入成功的指標
-                success_indicators = self.driver.find_elements(By.XPATH, "//*[contains(text(),'Welcome') or contains(text(),'Dashboard') or contains(text(),'Attendance')]")
-                if success_indicators:
-                    print("✅ 登入成功 - 找到成功指標")
-                    return True
-                
                 print("❌ 登入失敗 - 未找到登入成功指標")
                 return False
                 
