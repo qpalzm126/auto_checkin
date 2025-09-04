@@ -290,13 +290,30 @@ class AttendanceParser:
         if not records:
             return "not_checked_in"
         
-        # 檢查最後一筆記錄
-        last_record = records[-1]
+        print(f"🔍 分析打卡記錄以判斷當前狀態...")
+        print(f"   記錄數量: {len(records)}")
         
-        if last_record['check_out'] == "":
-            return "checked_in"  # 已上班，未下班
+        # 顯示所有記錄
+        for i, record in enumerate(records):
+            print(f"   記錄 {i+1}: check_in='{record['check_in']}', check_out='{record['check_out']}'")
+        
+        # 檢查最後一筆記錄的狀態
+        last_record = records[-1]
+        print(f"   最後一筆記錄: check_in='{last_record['check_in']}', check_out='{last_record['check_out']}'")
+        
+        # 判斷狀態邏輯
+        if not last_record['check_in']:
+            # 最後一筆記錄沒有上班時間
+            status = "not_checked_in"
+        elif not last_record['check_out']:
+            # 最後一筆記錄有上班時間但沒有下班時間
+            status = "checked_in"
         else:
-            return "checked_out"  # 已下班
+            # 最後一筆記錄有完整的上班和下班時間
+            status = "checked_out"
+        
+        print(f"   判斷結果: {status}")
+        return status
 
     @staticmethod
     def calculate_work_hours(records):
