@@ -56,15 +56,44 @@ class AttendanceParser:
                 print(f"📝 容器文本: {all_text}")
                 
                 # 排除時區相關的文本
-                timezone_keywords = ['Eastern Time Zone', 'Central Time Zone', 'Mountain Time Zone', 
-                                   'Pacific Time Zone', 'East Asia Time Zone', 'India Standard Time',
-                                   'Ann Arbor', 'Pittsburgh', 'Durham', 'Chicago', 'Texas', 'Colorado',
-                                   'Washington', 'California', 'Taiwan', 'Singapore', 'Malaysia']
+                timezone_keywords = [
+                    # 完整時區名稱
+                    'Eastern Time Zone', 'Central Time Zone', 'Mountain Time Zone', 
+                    'Pacific Time Zone', 'East Asia Time Zone', 'India Standard Time',
+                    'Greenwich Mean Time', 'Coordinated Universal Time',
+                    # 時區縮寫
+                    'EST', 'CST', 'MST', 'PST', 'EDT', 'CDT', 'MDT', 'PDT',
+                    'GMT', 'UTC', 'JST', 'KST', 'CST', 'IST',
+                    # UTC/GMT 偏移
+                    'UTC+', 'UTC-', 'GMT+', 'GMT-',
+                    # 地區名稱
+                    'Ann Arbor', 'Pittsburgh', 'Durham', 'Chicago', 'Texas', 'Colorado',
+                    'Washington', 'California', 'Taiwan', 'Singapore', 'Malaysia',
+                    'New York', 'Los Angeles', 'Seattle', 'Boston', 'Miami',
+                    'Asia/', 'America/', 'Europe/', 'Africa/', 'Australia/',
+                    # 其他可能的時區標識
+                    'Time Zone', 'Timezone', 'TZ', 'Offset'
+                ]
                 
                 # 檢查是否包含時區關鍵字
                 is_timezone_section = any(keyword in all_text for keyword in timezone_keywords)
-                if is_timezone_section:
+                
+                # 額外檢查：使用正則表達式檢測時區模式
+                timezone_patterns = [
+                    r'UTC[+-]\d+',  # UTC+8, UTC-5
+                    r'GMT[+-]\d+',  # GMT+8, GMT-5
+                    r'\b[A-Z]{3,4}\b',  # EST, CST, PST, JST
+                    r'[A-Z][a-z]+ Time Zone',  # Eastern Time Zone
+                    r'Asia/[A-Za-z_]+',  # Asia/Taipei
+                    r'America/[A-Za-z_]+',  # America/New_York
+                ]
+                
+                has_timezone_pattern = any(re.search(pattern, all_text, re.IGNORECASE) for pattern in timezone_patterns)
+                
+                if is_timezone_section or has_timezone_pattern:
                     print("⚠️ 檢測到時區區域，跳過此容器")
+                    print(f"   關鍵字匹配: {is_timezone_section}")
+                    print(f"   模式匹配: {has_timezone_pattern}")
                     # 如果找不到今日記錄，使用預設時間
                     today_date = datetime.datetime.now().date()
                     fallback_time = datetime.time(hour=9, minute=0)
@@ -77,13 +106,30 @@ class AttendanceParser:
                 print(f"🕐 找到所有時間: {times}")
                 
                 if times:
-                    # 取第一個找到的時間作為上班時間
-                    time_str = times[0]
-                    today_date = datetime.datetime.now().date()
-                    check_in_time = datetime.datetime.strptime(time_str, "%H:%M").time()
-                    work_start = datetime.datetime.combine(today_date, check_in_time)
-                    print(f"🕘 備用方法偵測到今日上班時間: {work_start}")
-                    return work_start
+                    # 過濾掉可能的時區時間（通常時區時間不會是打卡時間）
+                    valid_times = []
+                    for time_str in times:
+                        try:
+                            hour, minute = map(int, time_str.split(':'))
+                            # 排除明顯不是打卡時間的時間
+                            # 打卡時間通常在 6:00-22:00 之間
+                            if 6 <= hour <= 22:
+                                valid_times.append(time_str)
+                            else:
+                                print(f"   ⚠️ 跳過可疑時間: {time_str} (不在正常打卡時間範圍)")
+                        except ValueError:
+                            print(f"   ⚠️ 跳過無效時間格式: {time_str}")
+                    
+                    if valid_times:
+                        # 取第一個有效時間作為上班時間
+                        time_str = valid_times[0]
+                        today_date = datetime.datetime.now().date()
+                        check_in_time = datetime.datetime.strptime(time_str, "%H:%M").time()
+                        work_start = datetime.datetime.combine(today_date, check_in_time)
+                        print(f"🕘 備用方法偵測到今日上班時間: {work_start}")
+                        return work_start
+                    else:
+                        print("⚠️ 沒有找到有效的打卡時間")
                 else:
                     print("⚠️ 沒有找到時間格式")
                     
@@ -152,14 +198,43 @@ class AttendanceParser:
                     print(f"   行文本: {row_text}")
                     
                     # 檢查是否為時區相關行
-                    timezone_keywords = ['Eastern Time Zone', 'Central Time Zone', 'Mountain Time Zone', 
-                                       'Pacific Time Zone', 'East Asia Time Zone', 'India Standard Time',
-                                       'Ann Arbor', 'Pittsburgh', 'Durham', 'Chicago', 'Texas', 'Colorado',
-                                       'Washington', 'California', 'Taiwan', 'Singapore', 'Malaysia']
+                    timezone_keywords = [
+                        # 完整時區名稱
+                        'Eastern Time Zone', 'Central Time Zone', 'Mountain Time Zone', 
+                        'Pacific Time Zone', 'East Asia Time Zone', 'India Standard Time',
+                        'Greenwich Mean Time', 'Coordinated Universal Time',
+                        # 時區縮寫
+                        'EST', 'CST', 'MST', 'PST', 'EDT', 'CDT', 'MDT', 'PDT',
+                        'GMT', 'UTC', 'JST', 'KST', 'CST', 'IST',
+                        # UTC/GMT 偏移
+                        'UTC+', 'UTC-', 'GMT+', 'GMT-',
+                        # 地區名稱
+                        'Ann Arbor', 'Pittsburgh', 'Durham', 'Chicago', 'Texas', 'Colorado',
+                        'Washington', 'California', 'Taiwan', 'Singapore', 'Malaysia',
+                        'New York', 'Los Angeles', 'Seattle', 'Boston', 'Miami',
+                        'Asia/', 'America/', 'Europe/', 'Africa/', 'Australia/',
+                        # 其他可能的時區標識
+                        'Time Zone', 'Timezone', 'TZ', 'Offset'
+                    ]
                     
                     is_timezone_row = any(keyword in row_text for keyword in timezone_keywords)
-                    if is_timezone_row:
+                    
+                    # 額外檢查：使用正則表達式檢測時區模式
+                    timezone_patterns = [
+                        r'UTC[+-]\d+',  # UTC+8, UTC-5
+                        r'GMT[+-]\d+',  # GMT+8, GMT-5
+                        r'\b[A-Z]{3,4}\b',  # EST, CST, PST, JST
+                        r'[A-Z][a-z]+ Time Zone',  # Eastern Time Zone
+                        r'Asia/[A-Za-z_]+',  # Asia/Taipei
+                        r'America/[A-Za-z_]+',  # America/New_York
+                    ]
+                    
+                    has_timezone_pattern = any(re.search(pattern, row_text, re.IGNORECASE) for pattern in timezone_patterns)
+                    
+                    if is_timezone_row or has_timezone_pattern:
                         print(f"   ⚠️ 第 {i+1} 行是時區行，跳過")
+                        print(f"      關鍵字匹配: {is_timezone_row}")
+                        print(f"      模式匹配: {has_timezone_pattern}")
                         continue
                     
                     # 使用正則表達式提取時間
@@ -168,14 +243,31 @@ class AttendanceParser:
                     print(f"   找到時間: {times}")
                     
                     if len(times) >= 1:
-                        check_in_time = times[0]
-                        check_out_time = times[1] if len(times) > 1 else ""
+                        # 過濾掉可能的時區時間
+                        valid_times = []
+                        for time_str in times:
+                            try:
+                                hour, minute = map(int, time_str.split(':'))
+                                # 排除明顯不是打卡時間的時間
+                                # 打卡時間通常在 6:00-22:00 之間
+                                if 6 <= hour <= 22:
+                                    valid_times.append(time_str)
+                                else:
+                                    print(f"      ⚠️ 跳過可疑時間: {time_str} (不在正常打卡時間範圍)")
+                            except ValueError:
+                                print(f"      ⚠️ 跳過無效時間格式: {time_str}")
                         
-                        records.append({
-                            'check_in': check_in_time,
-                            'check_out': check_out_time
-                        })
-                        print(f"   ✅ 記錄 {i+1}: Check in={check_in_time}, Check out={check_out_time}")
+                        if valid_times:
+                            check_in_time = valid_times[0]
+                            check_out_time = valid_times[1] if len(valid_times) > 1 else ""
+                            
+                            records.append({
+                                'check_in': check_in_time,
+                                'check_out': check_out_time
+                            })
+                            print(f"   ✅ 記錄 {i+1}: Check in={check_in_time}, Check out={check_out_time}")
+                        else:
+                            print(f"   ⚠️ 第 {i+1} 行沒有找到有效的打卡時間")
                     else:
                         print(f"   ⚠️ 第 {i+1} 行沒有找到時間")
                     
