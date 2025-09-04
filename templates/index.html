@@ -1,0 +1,381 @@
+{% extends "base.html" %} {% block title %}自動打卡系統 - 首頁{% endblock %} {%
+block content %}
+
+<div class="row">
+  <!-- 打卡時間設定 -->
+  <div class="col-lg-6 mb-4">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-cog"></i> 打卡時間設定</h5>
+      </div>
+      <div class="card-body">
+        <form id="scheduleForm">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="check_in_time" class="form-label">上班時間</label>
+              <input
+                type="time"
+                class="form-control"
+                id="check_in_time"
+                name="check_in_time"
+                value="{{ config.check_in_time }}"
+                required
+              />
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="lunch_out_time" class="form-label"
+                >午休下班時間</label
+              >
+              <input
+                type="time"
+                class="form-control"
+                id="lunch_out_time"
+                name="lunch_out_time"
+                value="{{ config.lunch_out_time }}"
+                required
+              />
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="lunch_in_time" class="form-label">午休上班時間</label>
+              <input
+                type="time"
+                class="form-control"
+                id="lunch_in_time"
+                name="lunch_in_time"
+                value="{{ config.lunch_in_time }}"
+                required
+              />
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="check_out_time" class="form-label">下班時間</label>
+              <input
+                type="time"
+                class="form-control"
+                id="check_out_time"
+                name="check_out_time"
+                value="{{ config.check_out_time }}"
+                required
+              />
+            </div>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="enabled"
+            name="enabled" {{ 'checked' if config.enabled else '' }}>
+            <label class="form-check-label" for="enabled"> 啟用自動打卡 </label>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save"></i> 儲存設定
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 手動打卡 -->
+  <div class="col-lg-6 mb-4">
+    <div class="card">
+      <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="fas fa-hand-paper"></i> 手動打卡</h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-6 mb-2">
+            <button
+              class="btn btn-outline-primary w-100"
+              onclick="manualCheckin('check_in')"
+            >
+              <i class="fas fa-sign-in-alt"></i><br />上班打卡
+            </button>
+          </div>
+          <div class="col-6 mb-2">
+            <button
+              class="btn btn-outline-warning w-100"
+              onclick="manualCheckin('lunch_out')"
+            >
+              <i class="fas fa-utensils"></i><br />午休下班
+            </button>
+          </div>
+          <div class="col-6 mb-2">
+            <button
+              class="btn btn-outline-info w-100"
+              onclick="manualCheckin('lunch_in')"
+            >
+              <i class="fas fa-coffee"></i><br />午休上班
+            </button>
+          </div>
+          <div class="col-6 mb-2">
+            <button
+              class="btn btn-outline-danger w-100"
+              onclick="manualCheckin('check_out')"
+            >
+              <i class="fas fa-sign-out-alt"></i><br />下班打卡
+            </button>
+          </div>
+        </div>
+        <hr />
+        <div class="text-center">
+          <button class="btn btn-info me-2" onclick="getAttendanceStatus()">
+            <i class="fas fa-sync"></i> 重新整理狀態
+          </button>
+          <button class="btn btn-secondary" onclick="testEmail()">
+            <i class="fas fa-envelope"></i> 測試郵件
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 打卡狀態 -->
+<div class="row">
+  <div class="col-12 mb-4">
+    <div class="card">
+      <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="fas fa-chart-line"></i> 今日打卡狀態</h5>
+      </div>
+      <div class="card-body">
+        <div id="attendanceStatus">
+          <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">載入中...</span>
+            </div>
+            <p class="mt-2">正在載入打卡狀態...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 最近日誌 -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0"><i class="fas fa-history"></i> 最近日誌</h5>
+      </div>
+      <div class="card-body">
+        <div class="log-container">
+          {% if logs %} {% for log in logs[-10:] %}
+          <div class="log-entry">
+            <span class="log-time">{{ log[:19] }}</span>
+            <span class="log-message">{{ log[20:] }}</span>
+          </div>
+          {% endfor %} {% else %}
+          <p class="text-muted">暫無日誌記錄</p>
+          {% endif %}
+        </div>
+        <div class="text-center mt-3">
+          <a href="{{ url_for('logs') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-list"></i> 查看完整日誌
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  // 儲存打卡時間設定
+  document
+    .getElementById("scheduleForm")
+    .addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+
+      fetch("/update_schedule", {
+        method: "POST",
+        body: formData,
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.success) {
+            showAlert("success", data.message);
+          } else {
+            showAlert("danger", data.message);
+          }
+        })
+        .catch((error) => {
+          showAlert("danger", "設定更新失敗: " + error);
+        });
+    });
+
+  // 手動打卡
+  function manualCheckin(action) {
+    const actionNames = {
+      check_in: "上班打卡",
+      lunch_out: "午休下班",
+      lunch_in: "午休上班",
+      check_out: "下班打卡",
+    };
+
+    if (!confirm(`確定要執行${actionNames[action]}嗎？`)) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("action", action);
+
+    fetch("/manual_checkin", {
+      method: "POST",
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          showAlert("success", data.message);
+          getAttendanceStatus(); // 重新整理狀態
+        } else {
+          showAlert("danger", data.message);
+        }
+      })
+      .catch((error) => {
+        showAlert("danger", "打卡失敗: " + error);
+      });
+  }
+
+  // 獲取打卡狀態
+  function getAttendanceStatus() {
+    fetch("/get_attendance_status")
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          displayAttendanceStatus(data);
+        } else {
+          document.getElementById(
+            "attendanceStatus"
+          ).innerHTML = `<div class="alert alert-warning">${data.message}</div>`;
+        }
+      })
+      .catch((error) => {
+        document.getElementById(
+          "attendanceStatus"
+        ).innerHTML = `<div class="alert alert-danger">載入狀態失敗: ${error}</div>`;
+      });
+  }
+
+  // 顯示打卡狀態
+  function displayAttendanceStatus(data) {
+    const status = data.status;
+    const records = data.records;
+    const workHours = data.work_hours;
+
+    let statusHtml = "";
+
+    // 狀態指示器
+    let statusClass = "secondary";
+    let statusText = "未知";
+    let statusIcon = "question";
+
+    switch (status) {
+      case "not_checked_in":
+        statusClass = "warning";
+        statusText = "尚未打卡";
+        statusIcon = "clock";
+        break;
+      case "checked_in":
+        statusClass = "success";
+        statusText = "已上班";
+        statusIcon = "check-circle";
+        break;
+      case "checked_out":
+        statusClass = "info";
+        statusText = "已下班";
+        statusIcon = "home";
+        break;
+    }
+
+    statusHtml += `
+        <div class="row">
+            <div class="col-md-4">
+                <div class="text-center">
+                    <h4><span class="badge bg-${statusClass}"><i class="fas fa-${statusIcon}"></i> ${statusText}</span></h4>
+                    <p class="text-muted">當前狀態</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <h4><span class="badge bg-primary">${workHours} 小時</span></h4>
+                    <p class="text-muted">今日工時</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <h4><span class="badge bg-secondary">${records.length} 筆</span></h4>
+                    <p class="text-muted">打卡記錄</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 打卡記錄
+    if (records.length > 0) {
+      statusHtml +=
+        '<hr><h6>今日打卡記錄:</h6><div class="table-responsive"><table class="table table-sm">';
+      statusHtml +=
+        "<thead><tr><th>上班時間</th><th>下班時間</th><th>工時</th></tr></thead><tbody>";
+
+      records.forEach((record) => {
+        const checkIn = record.check_in || "-";
+        const checkOut = record.check_out || "-";
+        let duration = "-";
+
+        if (record.check_in && record.check_out) {
+          const inTime = new Date(`2000-01-01 ${record.check_in}`);
+          const outTime = new Date(`2000-01-01 ${record.check_out}`);
+          const diff = (outTime - inTime) / (1000 * 60 * 60);
+          duration = `${diff.toFixed(1)} 小時`;
+        }
+
+        statusHtml += `<tr><td>${checkIn}</td><td>${checkOut}</td><td>${duration}</td></tr>`;
+      });
+
+      statusHtml += "</tbody></table></div>";
+    }
+
+    document.getElementById("attendanceStatus").innerHTML = statusHtml;
+  }
+
+  // 測試郵件
+  function testEmail() {
+    fetch("/test_email")
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          showAlert("success", data.message);
+        } else {
+          showAlert("danger", data.message);
+        }
+      })
+      .catch((error) => {
+        showAlert("danger", "郵件測試失敗: " + error);
+      });
+  }
+
+  // 顯示提示訊息
+  function showAlert(type, message) {
+    const alertDiv = document.createElement("div");
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    const container = document.querySelector(".container");
+    container.insertBefore(alertDiv, container.firstChild);
+
+    // 5秒後自動消失
+    setTimeout(() => {
+      if (alertDiv.parentNode) {
+        alertDiv.remove();
+      }
+    }, 5000);
+  }
+
+  // 頁面載入時獲取打卡狀態
+  document.addEventListener("DOMContentLoaded", function () {
+    getAttendanceStatus();
+  });
+</script>
+{% endblock %}
