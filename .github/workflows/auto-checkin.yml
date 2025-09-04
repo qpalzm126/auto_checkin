@@ -10,6 +10,10 @@ on:
     - cron: "0 5 * * 1-5"
     # 台灣時間 17:46 下班打卡（UTC 09:46）
     - cron: "46 9 * * 1-5"
+    # 台灣時間 20:00 額外下班打卡時間（UTC 12:00）
+    - cron: "0 12 * * 1-5"
+    # 台灣時間 22:00 最後下班打卡時間（UTC 14:00）
+    - cron: "0 14 * * 1-5"
   workflow_dispatch: # 手動觸發
 
 jobs:
@@ -36,6 +40,16 @@ jobs:
           echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
+
+      - name: Test email configuration
+        env:
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: |
+          python debug_email.py
 
       - name: Run auto check-in
         env:

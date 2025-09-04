@@ -152,12 +152,37 @@ class WebAutomation:
                         duration = now - self.work_start_time
                         hours = duration.total_seconds() / 3600
                         if hours < 8:
-                            delay_minutes = int((8 - hours) * 60) + 1
-                            new_time = now + datetime.timedelta(minutes=delay_minutes)
-                            print(f"⏳ 未滿 8 小時，延後到 {new_time.strftime('%H:%M')} 下班打卡")
-                            schedule.every().day.at(new_time.strftime("%H:%M")).do(self.punch_in, label="下班")
-                            self.driver.quit()
-                            return
+                            # 在 GitHub Actions 環境中，發送郵件通知而不是延後
+                            if os.getenv("GITHUB_ACTIONS"):
+                                print(f"⏳ 工時不足 8 小時 (目前: {hours:.1f} 小時)，發送通知郵件")
+                                remaining_hours = 8 - hours
+                                remaining_minutes = int(remaining_hours * 60)
+                                
+                                # 發送工時不足通知
+                                subject = f"工時不足通知 - 需要再工作 {remaining_minutes} 分鐘"
+                                body = f"""
+工時檢查結果：
+- 目前工時：{hours:.1f} 小時
+- 需要工時：8 小時
+- 還需要：{remaining_minutes} 分鐘
+
+請手動啟動 GitHub Actions 工作流程來執行下班打卡。
+
+工作流程連結：https://github.com/你的用戶名/你的倉庫名/actions/workflows/auto-checkin.yml
+                                """
+                                
+                                EmailService.send_email(subject, body)
+                                result = f"工時不足 ({hours:.1f}小時)，已發送通知郵件"
+                                self.driver.quit()
+                                return
+                            else:
+                                # 本地環境：延後打卡
+                                delay_minutes = int((8 - hours) * 60) + 1
+                                new_time = now + datetime.timedelta(minutes=delay_minutes)
+                                print(f"⏳ 未滿 8 小時，延後到 {new_time.strftime('%H:%M')} 下班打卡")
+                                schedule.every().day.at(new_time.strftime("%H:%M")).do(self.punch_in, label="下班")
+                                self.driver.quit()
+                                return
                     should_punch = True
                     result = "下班打卡成功"
                 else:
