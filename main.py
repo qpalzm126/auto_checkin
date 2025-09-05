@@ -35,23 +35,27 @@ def main():
         current_time = datetime.datetime.now().strftime("%H:%M")
         print(f"⏰ 當前時間 (UTC): {current_time}")
 
+        # 判斷打卡來源
+        checkin_source = "GitHub Actions 手動觸發" if os.getenv(
+            "GITHUB_EVENT_NAME") == "workflow_dispatch" else "GitHub Actions 排程"
+
         # 根據當前時間判斷應該執行哪個打卡動作（UTC 時間）
         # 台灣時間 08:30 = UTC 00:30
         if current_time >= "00:30" and current_time <= "01:15":
             print("🕘 執行上班打卡 (台灣時間 08:45)")
-            run_checkin("上班")
+            run_checkin("上班", source=checkin_source)
         # 台灣時間 11:50 = UTC 03:50
         elif current_time >= "03:50" and current_time <= "04:15":
             print("🕘 執行午休下班打卡 (台灣時間 12:00)")
-            run_checkin("午休下班")
+            run_checkin("午休下班", source=checkin_source)
         # 台灣時間 12:50 = UTC 04:50
         elif current_time >= "04:50" and current_time <= "05:15":
             print("🕘 執行午休上班打卡 (台灣時間 13:00)")
-            run_checkin("午休上班")
+            run_checkin("午休上班", source=checkin_source)
         # 台灣時間 17:45 = UTC 09:45
         elif current_time >= "09:40" and current_time <= "11:00":
             print("🕘 執行下班打卡 (台灣時間 17:45)")
-            run_checkin("下班")
+            run_checkin("下班", source=checkin_source)
         # 台灣時間 18:30 = UTC 10:00
         # elif current_time >= "11:00" and current_time <= "11:15":
         #     print("🕘 執行下班打卡 (台灣時間 19:00)")
@@ -73,7 +77,7 @@ def main():
             time.sleep(1)
 
 
-def run_checkin(label):
+def run_checkin(label, source=None):
     """執行打卡動作"""
     automation = WebAutomation()
     try:
@@ -82,7 +86,8 @@ def run_checkin(label):
             automation.punch_in(label)
     except Exception as e:
         print(f"❌ 打卡過程出錯: {e}")
-        EmailService.send_checkin_notification(f"打卡失敗: {e}", label)
+        EmailService.send_checkin_notification(
+            f"打卡失敗: {e}", label, source=source)
     finally:
         automation.quit()
 
@@ -104,10 +109,10 @@ def setup_schedule():
         return
 
     print("⏰ 設置排程...")
-    schedule.every().day.at("08:45").do(lambda: run_checkin("上班"))
-    schedule.every().day.at("12:00").do(lambda: run_checkin("午休下班"))
-    schedule.every().day.at("13:00").do(lambda: run_checkin("午休上班"))
-    schedule.every().day.at("17:46").do(lambda: run_checkin("下班"))
+    schedule.every().day.at("08:45").do(lambda: run_checkin("上班", source="本地環境"))
+    schedule.every().day.at("12:00").do(lambda: run_checkin("午休下班", source="本地環境"))
+    schedule.every().day.at("13:00").do(lambda: run_checkin("午休上班", source="本地環境"))
+    schedule.every().day.at("17:46").do(lambda: run_checkin("下班", source="本地環境"))
     print("✅ 排程設置完成")
 
 
