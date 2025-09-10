@@ -26,23 +26,12 @@ class AttendanceParser:
         try:
             print(f"🔍 正在尋找今日上班時間，日期: {today_str}")
             
-            # # 方法1: 尋找包含今日日期的 div
-            # try:
-            #     date_div = driver.find_element(By.XPATH, f"//div[contains(text(), '{today_str}')]")
-            #     print(f"✅ 找到日期 div: {date_div.text}")
-                
-            #     # 找到包含這個日期的容器
-            #     container = date_div.find_element(By.XPATH, "./ancestor::div[contains(@class,'border') and contains(@class,'px-3')]")
-            #     print(f"✅ 找到日期容器")
-                
-            # except Exception as e:
-            #     print(f"⚠️ 方法1失敗: {e}")
-                # 方法2: 直接尋找包含日期的容器
+            # 使用與 get_today_attendance_records 相同的方法
             try:
                 container = driver.find_element(By.XPATH, f"//div[contains(@class,'border') and contains(@class,'px-3') and .//div[contains(text(), '{today_str}')]]")
-                print(f"✅ 方法2找到日期容器")
-            except Exception as e2:
-                print(f"❌ 方法2也失敗: {e2}")
+                print(f"✅ 找到日期容器")
+            except Exception as e:
+                print(f"❌ 找不到今日記錄: {e}")
                 # 如果找不到今日記錄，使用預設時間
                 today_date = datetime.datetime.now().date()
                 fallback_time = datetime.time(hour=9, minute=0)
@@ -50,12 +39,29 @@ class AttendanceParser:
                 print(f"⚠️ 找不到今日記錄，備用方法使用預設上班時間: {work_start}")
                 return work_start
             
-            # 方法3: 使用正則表達式從容器文本中提取第一個時間（排除時區區域）
+            # 尋找所有打卡記錄行（排除標題行）
+            rows = container.find_elements(By.XPATH, ".//div[contains(@class,'row') and contains(@class,'border-bottom') and contains(@class,'hover-bg-primary-light')]")
+            print(f"📊 找到 {len(rows)} 個打卡記錄行")
+            
+            if not rows:
+                print("⚠️ 沒有找到打卡記錄行")
+                # 如果找不到記錄行，使用預設時間
+                today_date = datetime.datetime.now().date()
+                fallback_time = datetime.time(hour=9, minute=0)
+                work_start = datetime.datetime.combine(today_date, fallback_time)
+                print(f"⚠️ 沒有找到打卡記錄行，備用方法使用預設上班時間: {work_start}")
+                return work_start
+            
+            # 處理第一行記錄（最早的打卡記錄）
+            first_row = rows[0]
             try:
-                all_text = container.text
-                print(f"📝 容器文本: {all_text}")
+                print(f"🔍 解析第一行記錄...")
                 
-                # 排除時區相關的文本
+                # 獲取整行的文本
+                row_text = first_row.text
+                print(f"   行文本: {row_text}")
+                
+                # 檢查是否為時區相關行
                 timezone_keywords = [
                     # 完整時區名稱
                     'Eastern Time Zone', 'Central Time Zone', 'Mountain Time Zone', 
@@ -75,8 +81,7 @@ class AttendanceParser:
                     'Time Zone', 'Timezone', 'TZ', 'Offset'
                 ]
                 
-                # 檢查是否包含時區關鍵字
-                is_timezone_section = any(keyword in all_text for keyword in timezone_keywords)
+                is_timezone_row = any(keyword in row_text for keyword in timezone_keywords)
                 
                 # 額外檢查：使用正則表達式檢測時區模式
                 timezone_patterns = [
@@ -88,25 +93,26 @@ class AttendanceParser:
                     r'America/[A-Za-z_]+',  # America/New_York
                 ]
                 
-                has_timezone_pattern = any(re.search(pattern, all_text, re.IGNORECASE) for pattern in timezone_patterns)
+                has_timezone_pattern = any(re.search(pattern, row_text, re.IGNORECASE) for pattern in timezone_patterns)
                 
-                if is_timezone_section or has_timezone_pattern:
-                    print("⚠️ 檢測到時區區域，跳過此容器")
-                    print(f"   關鍵字匹配: {is_timezone_section}")
-                    print(f"   模式匹配: {has_timezone_pattern}")
-                    # 如果找不到今日記錄，使用預設時間
+                if is_timezone_row or has_timezone_pattern:
+                    print(f"   ⚠️ 第一行是時區行，跳過")
+                    print(f"      關鍵字匹配: {is_timezone_row}")
+                    print(f"      模式匹配: {has_timezone_pattern}")
+                    # 如果第一行是時區行，使用預設時間
                     today_date = datetime.datetime.now().date()
                     fallback_time = datetime.time(hour=9, minute=0)
                     work_start = datetime.datetime.combine(today_date, fallback_time)
-                    print(f"⚠️ 跳過時區區域，備用方法使用預設上班時間: {work_start}")
+                    print(f"⚠️ 第一行是時區行，備用方法使用預設上班時間: {work_start}")
                     return work_start
                 
+                # 使用正則表達式提取時間
                 time_pattern = r'\b(\d{1,2}:\d{2})\b'
-                times = re.findall(time_pattern, all_text)
-                print(f"🕐 找到所有時間: {times}")
+                times = re.findall(time_pattern, row_text)
+                print(f"   找到時間: {times}")
                 
                 if times:
-                    # 過濾掉可能的時區時間（通常時區時間不會是打卡時間）
+                    # 過濾掉可能的時區時間
                     valid_times = []
                     for time_str in times:
                         try:
@@ -116,9 +122,9 @@ class AttendanceParser:
                             if 6 <= hour <= 22:
                                 valid_times.append(time_str)
                             else:
-                                print(f"   ⚠️ 跳過可疑時間: {time_str} (不在正常打卡時間範圍)")
+                                print(f"      ⚠️ 跳過可疑時間: {time_str} (不在正常打卡時間範圍)")
                         except ValueError:
-                            print(f"   ⚠️ 跳過無效時間格式: {time_str}")
+                            print(f"      ⚠️ 跳過無效時間格式: {time_str}")
                     
                     if valid_times:
                         # 取第一個有效時間作為上班時間
@@ -134,7 +140,7 @@ class AttendanceParser:
                     print("⚠️ 沒有找到時間格式")
                     
             except Exception as e:
-                print(f"⚠️ 正則表達式解析失敗: {e}")
+                print(f"⚠️ 解析第一行記錄失敗: {e}")
                 
         except Exception as e:
             print(f"❌ 讀取 Check in 失敗: {e}")
