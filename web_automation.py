@@ -105,11 +105,21 @@ class WebAutomation:
             if not self.work_start_time:
                 self.work_start_time = AttendanceParser.get_today_check_in(self.driver)
         
+        # 調試信息：顯示當前上班時間
+        if self.work_start_time:
+            print(f"🔍 當前設定的上班時間: {self.work_start_time}")
+        else:
+            print("⚠️ 警告：無法獲取上班時間，工時檢查將被跳過")
+        
         buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(),'Check in') or contains(text(),'Check out')]")
         if not buttons:
             log_entry = f"{label}: 找不到打卡按鈕"
             self.today_log.append(log_entry)
-            EmailService.send_email(f"打卡結果: {label}", "\n".join(self.today_log))
+            EmailService.send_checkin_notification(
+                "找不到打卡按鈕", 
+                label, 
+                source="系統檢查"
+            )
             self.driver.quit()
             return
 
@@ -151,6 +161,8 @@ class WebAutomation:
                     if self.work_start_time:
                         duration = now - self.work_start_time
                         hours = duration.total_seconds() / 3600
+                        print(f"🕐 工時檢查: 上班時間={self.work_start_time}, 當前時間={now}, 工時={hours:.1f}小時")
+                        
                         if hours < 8:
                             # 在 GitHub Actions 環境中，發送郵件通知而不是延後
                             if os.getenv("GITHUB_ACTIONS"):
@@ -159,19 +171,12 @@ class WebAutomation:
                                 remaining_minutes = int(remaining_hours * 60)
                                 
                                 # 發送工時不足通知
-                                subject = f"工時不足通知 - 需要再工作 {remaining_minutes} 分鐘"
-                                body = f"""
-工時檢查結果：
-- 目前工時：{hours:.1f} 小時
-- 需要工時：8 小時
-- 還需要：{remaining_minutes} 分鐘
-
-請手動啟動 GitHub Actions 工作流程來執行下班打卡。
-
-工作流程連結：https://github.com/你的用戶名/你的倉庫名/actions/workflows/auto-checkin.yml
-                                """
-                                
-                                EmailService.send_email(subject, body)
+                                EmailService.send_checkin_notification(
+                                    f"工時不足 ({hours:.1f}小時)，需要再工作 {remaining_minutes} 分鐘", 
+                                    "下班打卡 - 工時不足", 
+                                    work_hours=hours,
+                                    source="GitHub Actions 工時檢查"
+                                )
                                 result = f"工時不足 ({hours:.1f}小時)，已發送通知郵件"
                                 self.driver.quit()
                                 return
@@ -183,6 +188,11 @@ class WebAutomation:
                                 schedule.every().day.at(new_time.strftime("%H:%M")).do(self.punch_in, label="下班")
                                 self.driver.quit()
                                 return
+                        else:
+                            print(f"✅ 工時充足 ({hours:.1f}小時)，可以下班打卡")
+                    else:
+                        print("⚠️ 無法獲取上班時間，跳過工時檢查")
+                    
                     should_punch = True
                     result = "下班打卡成功"
                 else:
@@ -205,7 +215,11 @@ class WebAutomation:
         self.today_log.append(log_entry)
 
         # 寄信通知
-        EmailService.send_email(f"打卡結果: {label}", "\n".join(self.today_log))
+        EmailService.send_checkin_notification(
+            result, 
+            label, 
+            source="打卡系統"
+        )
 
         print(f"📌 {label} 完成: {result}")
         self.driver.quit()
