@@ -86,7 +86,7 @@ class AttendanceParser:
                     timezone_patterns = [
                         r'UTC[+-]\d+',  # UTC+8, UTC-5
                         r'GMT[+-]\d+',  # GMT+8, GMT-5
-                        r'\b[A-Z]{3,4}\b',  # EST, CST, PST, JST
+                        r'\b(EST|CST|MST|PST|EDT|CDT|MDT|PDT|GMT|UTC|JST|KST|IST)\b',  # 特定時區縮寫
                         r'[A-Z][a-z]+ Time Zone',  # Eastern Time Zone
                         r'Asia/[A-Za-z_]+',  # Asia/Taipei
                         r'America/[A-Za-z_]+',  # America/New_York
