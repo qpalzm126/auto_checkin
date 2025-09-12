@@ -97,13 +97,19 @@ class WebAutomation:
                         print(f"🕘 使用當天第一筆打卡記錄作為上班時間: {self.work_start_time}")
                 except Exception as e:
                     print(f"⚠️ 解析第一筆打卡時間失敗: {e}")
-                    # 如果解析失敗，使用備用方法
+                    # 如果解析失敗，設為預設時間
                     if not self.work_start_time:
-                        self.work_start_time = AttendanceParser.get_today_check_in(self.driver)
+                        today_date = datetime.datetime.now().date()
+                        fallback_time = datetime.time(hour=9, minute=0)
+                        self.work_start_time = datetime.datetime.combine(today_date, fallback_time)
+                        print(f"⚠️ 使用預設上班時間: {self.work_start_time}")
         else:
-            # 如果沒有打卡記錄，使用備用方法
+            # 如果沒有打卡記錄，設為預設時間
             if not self.work_start_time:
-                self.work_start_time = AttendanceParser.get_today_check_in(self.driver)
+                today_date = datetime.datetime.now().date()
+                fallback_time = datetime.time(hour=9, minute=0)
+                self.work_start_time = datetime.datetime.combine(today_date, fallback_time)
+                print(f"⚠️ 沒有打卡記錄，使用預設上班時間: {self.work_start_time}")
         
         # 調試信息：顯示當前上班時間
         if self.work_start_time:
@@ -242,7 +248,10 @@ class WebAutomation:
             result = f"{label} 失敗: {e}"
 
         # 更新 log
-        check_in_time = AttendanceParser.get_today_check_in(self.driver)
+        # 從已獲取的打卡記錄中獲取上班時間
+        check_in_time = "N/A"
+        if attendance_records and attendance_records[0].get('check_in'):
+            check_in_time = attendance_records[0]['check_in']
         log_entry = f"{label}: {result}, Check in: {check_in_time}, Check out: 未抓取"
         self.today_log.append(log_entry)
 
@@ -297,11 +306,17 @@ class WebAutomation:
                             print(f"🕘 使用當天第一筆打卡記錄作為上班時間: {work_start}")
                     except Exception as e:
                         print(f"⚠️ 解析第一筆打卡時間失敗: {e}")
-                        work_start = AttendanceParser.get_today_check_in(self.driver)
-                        print(f"🕘 備用方法上班時間: {work_start}")
+                        # 使用預設時間
+                        today_date = datetime.datetime.now().date()
+                        fallback_time = datetime.time(hour=9, minute=0)
+                        work_start = datetime.datetime.combine(today_date, fallback_time)
+                        print(f"⚠️ 使用預設上班時間: {work_start}")
             else:
-                work_start = AttendanceParser.get_today_check_in(self.driver)
-                print(f"🕘 備用方法上班時間: {work_start}")
+                # 沒有打卡記錄，使用預設時間
+                today_date = datetime.datetime.now().date()
+                fallback_time = datetime.time(hour=9, minute=0)
+                work_start = datetime.datetime.combine(today_date, fallback_time)
+                print(f"⚠️ 沒有打卡記錄，使用預設上班時間: {work_start}")
             
             print(f"🕘 最終上班時間: {work_start}")
             
