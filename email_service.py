@@ -91,12 +91,20 @@ class EmailService:
             return False
 
         # 測試寄信
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        subject = f"🧪 自動打卡系統測試信 - {current_time}"
+        # 在 GitHub Actions 環境中顯示台灣時間，本地環境顯示本地時間
+        if os.getenv("GITHUB_ACTIONS"):
+            taiwan_time = datetime.datetime.now() + datetime.timedelta(hours=8)
+            current_time = taiwan_time.strftime("%Y-%m-%d %H:%M:%S")
+            timezone_info = " (台灣時間)"
+        else:
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            timezone_info = ""
+        
+        subject = f"🧪 自動打卡系統測試信 - {current_time}{timezone_info}"
         body = f"""
 這是一封測試信，用於驗證自動打卡系統的寄信功能。
 
-測試時間: {current_time}
+測試時間: {current_time}{timezone_info}
 系統狀態: 正常運作
 環境: {'GitHub Actions' if os.getenv('GITHUB_ACTIONS') else '本地環境'}
 
@@ -117,8 +125,17 @@ class EmailService:
     @staticmethod
     def send_checkin_notification(result, label, work_hours=None, source=None):
         """發送打卡通知郵件"""
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        subject = f"📅 自動打卡通知 - {label} - {current_time}"
+        # 在 GitHub Actions 環境中顯示台灣時間，本地環境顯示本地時間
+        if os.getenv("GITHUB_ACTIONS"):
+            # GitHub Actions 使用 UTC 時間，台灣時間 = UTC + 8
+            taiwan_time = datetime.datetime.now() + datetime.timedelta(hours=8)
+            current_time = taiwan_time.strftime("%Y-%m-%d %H:%M:%S")
+            timezone_info = " (台灣時間)"
+        else:
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            timezone_info = ""
+        
+        subject = f"📅 自動打卡通知 - {label} - {current_time}{timezone_info}"
 
         # 判斷打卡來源
         if source is None:
@@ -134,7 +151,7 @@ class EmailService:
         body = f"""
 自動打卡系統通知
 
-時間: {current_time}
+時間: {current_time}{timezone_info}
 動作: {label}
 結果: {result}
 來源: {source}
