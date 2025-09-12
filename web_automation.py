@@ -299,6 +299,38 @@ class WebAutomation:
                         print(f"    工時: 進行中...")
             else:
                 print("❌ 沒有找到打卡記錄")
+            
+            # 測試 current_status 判斷
+            print("\n🔍 測試 current_status 判斷...")
+            current_status = AttendanceParser.get_current_status(records)
+            print(f"📊 解析出的 current_status: {current_status}")
+            
+            # 驗證 current_status 的邏輯
+            if records:
+                last_record = records[-1]
+                print(f"📝 最後一筆記錄: check_in='{last_record.get('check_in', 'N/A')}', check_out='{last_record.get('check_out', 'N/A')}'")
+                
+                # 手動驗證狀態判斷邏輯
+                expected_status = None
+                if not last_record.get('check_in'):
+                    expected_status = "not_checked_in"
+                elif not last_record.get('check_out'):
+                    expected_status = "checked_in"
+                else:
+                    expected_status = "checked_out"
+                
+                print(f"🎯 預期狀態: {expected_status}")
+                
+                if current_status == expected_status:
+                    print("✅ current_status 判斷正確")
+                else:
+                    print(f"❌ current_status 判斷錯誤！預期: {expected_status}, 實際: {current_status}")
+            else:
+                print("ℹ️ 沒有打卡記錄，current_status 應該為 'not_checked_in'")
+                if current_status == "not_checked_in":
+                    print("✅ current_status 判斷正確")
+                else:
+                    print(f"❌ current_status 判斷錯誤！預期: not_checked_in, 實際: {current_status}")
                 
             # 測試按鈕狀態
             buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(),'Check in') or contains(text(),'Check out')]")
@@ -306,6 +338,31 @@ class WebAutomation:
                 print(f"🔘 找到 {len(buttons)} 個打卡按鈕:")
                 for i, btn in enumerate(buttons, 1):
                     print(f"  按鈕 {i}: {btn.text.strip()}")
+                
+                # 檢查按鈕狀態與 current_status 的一致性
+                print("\n🔍 檢查按鈕狀態與 current_status 的一致性...")
+                if buttons:
+                    btn_text = buttons[0].text.strip()
+                    print(f"📱 按鈕文字: '{btn_text}'")
+                    print(f"📊 current_status: '{current_status}'")
+                    
+                    # 驗證邏輯一致性
+                    is_consistent = False
+                    if current_status == "not_checked_in" and "Check in" in btn_text:
+                        is_consistent = True
+                        print("✅ 狀態一致: 未打卡 → 顯示 Check in 按鈕")
+                    elif current_status == "checked_in" and "Check out" in btn_text:
+                        is_consistent = True
+                        print("✅ 狀態一致: 已上班 → 顯示 Check out 按鈕")
+                    elif current_status == "checked_out" and "Check in" in btn_text:
+                        is_consistent = True
+                        print("✅ 狀態一致: 已下班 → 顯示 Check in 按鈕")
+                    else:
+                        print(f"❌ 狀態不一致: current_status='{current_status}' 但按鈕顯示 '{btn_text}'")
+                        print("💡 這可能表示:")
+                        print("   - 打卡記錄解析有問題")
+                        print("   - 按鈕狀態檢測有問題")
+                        print("   - 網頁狀態與記錄不同步")
             else:
                 print("❌ 沒有找到打卡按鈕")
                 
