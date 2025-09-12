@@ -156,42 +156,74 @@ class WebAutomation:
                     
             elif label == "下班":
                 if current_status == "checked_in" and "Check out" in btn_text:
-                    # 檢查工時
+                    # 檢查工時 - 使用正確的總工時計算
                     now = datetime.datetime.now()
-                    if self.work_start_time:
-                        duration = now - self.work_start_time
-                        hours = duration.total_seconds() / 3600
-                        print(f"🕐 工時檢查: 上班時間={self.work_start_time}, 當前時間={now}, 工時={hours:.1f}小時")
+                    
+                    # 計算當天總工時
+                    total_work_hours = 0
+                    current_work_hours = 0
+                    
+                    for record in attendance_records:
+                        check_in = record.get('check_in', 'N/A')
+                        check_out = record.get('check_out', 'N/A')
                         
-                        if hours < 8:
-                            # 在 GitHub Actions 環境中，發送郵件通知而不是延後
-                            if os.getenv("GITHUB_ACTIONS"):
-                                print(f"⏳ 工時不足 8 小時 (目前: {hours:.1f} 小時)，發送通知郵件")
-                                remaining_hours = 8 - hours
-                                remaining_minutes = int(remaining_hours * 60)
-                                
-                                # 發送工時不足通知
-                                EmailService.send_checkin_notification(
-                                    f"工時不足 ({hours:.1f}小時)，需要再工作 {remaining_minutes} 分鐘", 
-                                    "下班打卡 - 工時不足", 
-                                    work_hours=hours,
-                                    source="GitHub Actions 工時檢查"
-                                )
-                                result = f"工時不足 ({hours:.1f}小時)，已發送通知郵件"
-                                self.driver.quit()
-                                return
-                            else:
-                                # 本地環境：延後打卡
-                                delay_minutes = int((8 - hours) * 60) + 1
-                                new_time = now + datetime.timedelta(minutes=delay_minutes)
-                                print(f"⏳ 未滿 8 小時，延後到 {new_time.strftime('%H:%M')} 下班打卡")
-                                schedule.every().day.at(new_time.strftime("%H:%M")).do(self.punch_in, label="下班")
-                                self.driver.quit()
-                                return
+                        if check_in != 'N/A' and check_out != 'N/A' and check_out:
+                            # 已完成的工時段
+                            try:
+                                in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                                out_time = datetime.datetime.strptime(check_out, "%H:%M").time()
+                                today = datetime.datetime.now().date()
+                                in_datetime = datetime.datetime.combine(today, in_time)
+                                out_datetime = datetime.datetime.combine(today, out_time)
+                                duration = out_datetime - in_datetime
+                                hours = duration.total_seconds() / 3600
+                                total_work_hours += hours
+                            except Exception as e:
+                                print(f"⚠️ 工時計算失敗: {e}")
+                        elif check_in != 'N/A' and check_out == '':
+                            # 正在進行的工時段
+                            try:
+                                in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                                today = datetime.datetime.now().date()
+                                in_datetime = datetime.datetime.combine(today, in_time)
+                                duration = now - in_datetime
+                                hours = duration.total_seconds() / 3600
+                                current_work_hours = hours
+                            except Exception as e:
+                                print(f"⚠️ 當前工時計算失敗: {e}")
+                    
+                    # 總工時 = 已完成的工時 + 當前正在進行的工時
+                    total_work_hours += current_work_hours
+                    
+                    print(f"🕐 工時檢查: 已完成工時={total_work_hours - current_work_hours:.1f}小時, 當前工時={current_work_hours:.1f}小時, 總工時={total_work_hours:.1f}小時")
+                    
+                    if total_work_hours < 8:
+                        # 在 GitHub Actions 環境中，發送郵件通知而不是延後
+                        if os.getenv("GITHUB_ACTIONS"):
+                            print(f"⏳ 工時不足 8 小時 (目前: {total_work_hours:.1f} 小時)，發送通知郵件")
+                            remaining_hours = 8 - total_work_hours
+                            remaining_minutes = int(remaining_hours * 60)
+                            
+                            # 發送工時不足通知
+                            EmailService.send_checkin_notification(
+                                f"工時不足 ({total_work_hours:.1f}小時)，需要再工作 {remaining_minutes} 分鐘", 
+                                "下班打卡 - 工時不足", 
+                                work_hours=total_work_hours,
+                                source="GitHub Actions 工時檢查"
+                            )
+                            result = f"工時不足 ({total_work_hours:.1f}小時)，已發送通知郵件"
+                            self.driver.quit()
+                            return
                         else:
-                            print(f"✅ 工時充足 ({hours:.1f}小時)，可以下班打卡")
+                            # 本地環境：延後打卡
+                            delay_minutes = int((8 - total_work_hours) * 60) + 1
+                            new_time = now + datetime.timedelta(minutes=delay_minutes)
+                            print(f"⏳ 未滿 8 小時，延後到 {new_time.strftime('%H:%M')} 下班打卡")
+                            schedule.every().day.at(new_time.strftime("%H:%M")).do(self.punch_in, label="下班")
+                            self.driver.quit()
+                            return
                     else:
-                        print("⚠️ 無法獲取上班時間，跳過工時檢查")
+                        print(f"✅ 工時充足 ({total_work_hours:.1f}小時)，可以下班打卡")
                     
                     should_punch = True
                     result = "下班打卡成功"
@@ -429,6 +461,111 @@ class WebAutomation:
             if self.driver:
                 self.driver.quit()
             print("✅ 調試完成")
+    
+    def calculate_work_hours(self):
+        """計算今天滿8小時工時需要什麼時候下班"""
+        try:
+            print("🧮 開始計算工時...")
+            
+            # 獲取當天的打卡記錄
+            attendance_records = AttendanceParser.get_today_attendance_records(self.driver)
+            print(f"📊 打卡記錄數量: {len(attendance_records)}")
+            
+            if not attendance_records:
+                print("❌ 沒有找到今天的打卡記錄")
+                return
+            
+            # 顯示所有打卡記錄
+            print("\n📝 今天的打卡記錄:")
+            total_work_hours = 0
+            current_work_hours = 0  # 當前正在進行的工時
+            now = datetime.datetime.now()
+            
+            for i, record in enumerate(attendance_records, 1):
+                check_in = record.get('check_in', 'N/A')
+                check_out = record.get('check_out', 'N/A')
+                print(f"  第 {i} 次:")
+                print(f"    Check in:  {check_in}")
+                print(f"    Check out: {check_out}")
+                
+                # 計算這段的工時
+                if check_in != 'N/A' and check_out != 'N/A' and check_out:
+                    # 已完成的工時段
+                    try:
+                        in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                        out_time = datetime.datetime.strptime(check_out, "%H:%M").time()
+                        today = datetime.datetime.now().date()
+                        in_datetime = datetime.datetime.combine(today, in_time)
+                        out_datetime = datetime.datetime.combine(today, out_time)
+                        duration = out_datetime - in_datetime
+                        hours = duration.total_seconds() / 3600
+                        total_work_hours += hours
+                        print(f"    工時: {hours:.2f} 小時 (已完成)")
+                    except Exception as e:
+                        print(f"    工時計算失敗: {e}")
+                elif check_in != 'N/A' and check_out == '':
+                    # 正在進行的工時段
+                    try:
+                        in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                        today = datetime.datetime.now().date()
+                        in_datetime = datetime.datetime.combine(today, in_time)
+                        duration = now - in_datetime
+                        hours = duration.total_seconds() / 3600
+                        current_work_hours = hours
+                        print(f"    工時: {hours:.2f} 小時 (進行中)")
+                    except Exception as e:
+                        print(f"    當前工時計算失敗: {e}")
+            
+            # 總工時 = 已完成的工時 + 當前正在進行的工時
+            total_work_hours += current_work_hours
+            print(f"\n📊 已完成工時: {total_work_hours - current_work_hours:.2f} 小時")
+            print(f"📊 當前工時: {current_work_hours:.2f} 小時")
+            print(f"📊 總工時: {total_work_hours:.2f} 小時")
+            
+            # 檢查當前狀態
+            current_status = AttendanceParser.get_current_status(attendance_records)
+            print(f"📱 當前狀態: {current_status}")
+            
+            if current_status == "checked_out":
+                print("✅ 今天已經下班了")
+                if total_work_hours >= 8:
+                    print(f"🎉 恭喜！今天工時充足 ({total_work_hours:.2f} 小時)")
+                else:
+                    print(f"⚠️ 今天工時不足 ({total_work_hours:.2f} 小時 < 8 小時)")
+                return
+            
+            # 計算還需要多少工時
+            remaining_hours = 8 - total_work_hours
+            print(f"⏰ 還需要工時: {remaining_hours:.2f} 小時")
+            
+            if remaining_hours <= 0:
+                print("🎉 已經滿8小時了！可以下班了！")
+                return
+            
+            # 計算下班時間
+            if current_status == "checked_in":
+                # 如果正在上班，計算還需要多少時間
+                if remaining_hours > 0:
+                    # 從現在開始，還需要工作 remaining_hours 小時
+                    checkout_time = now + datetime.timedelta(hours=remaining_hours)
+                    print(f"⏰ 滿8小時的下班時間: {checkout_time.strftime('%H:%M')}")
+                    
+                    # 計算還需要多少時間
+                    time_remaining = checkout_time - now
+                    if time_remaining.total_seconds() > 0:
+                        remaining_minutes = int(time_remaining.total_seconds() / 60)
+                        print(f"⏳ 還需要工作: {remaining_minutes} 分鐘")
+                    else:
+                        print("🎉 已經可以下班了！")
+                else:
+                    print("🎉 已經滿8小時了！可以下班了！")
+            else:
+                print("ℹ️ 當前未在上班狀態，無法計算下班時間")
+                
+        except Exception as e:
+            print(f"❌ 計算工時失敗: {e}")
+            import traceback
+            traceback.print_exc()
     
     def quit(self):
         """關閉瀏覽器"""

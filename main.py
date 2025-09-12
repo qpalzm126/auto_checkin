@@ -19,6 +19,7 @@ def main():
     print("   - 使用 'python main.py test' 來測試打卡記錄解析")
     print("   - 使用 'python main.py debug' 來調試 HTML 結構")
     print("   - 使用 'python main.py email' 來測試寄信功能")
+    print("   - 使用 'python main.py hours' 來計算今天滿8小時的下班時間")
 
     # 顯示當前時間資訊
     current_time = datetime.datetime.now()
@@ -133,6 +134,22 @@ def email_test_mode():
     EmailService.test_email()
 
 
+def calculate_work_hours_mode():
+    """計算工時模式"""
+    automation = WebAutomation()
+    try:
+        automation.setup_driver()
+        if automation.login():
+            print("✅ 登入成功，開始計算工時...")
+            automation.calculate_work_hours()
+        else:
+            print("❌ 登入失敗，無法計算工時")
+    except Exception as e:
+        print(f"❌ 計算工時過程出錯: {e}")
+    finally:
+        automation.quit()
+
+
 if __name__ == "__main__":
     # 檢查是否為測試模式
     if len(sys.argv) > 1:
@@ -142,7 +159,9 @@ if __name__ == "__main__":
             debug_mode()
         elif sys.argv[1] == "email":
             email_test_mode()
+        elif sys.argv[1] == "hours":
+            calculate_work_hours_mode()
         else:
-            print("❌ 未知的參數。可用參數: test, debug, email")
+            print("❌ 未知的參數。可用參數: test, debug, email, hours")
     else:
         main()
