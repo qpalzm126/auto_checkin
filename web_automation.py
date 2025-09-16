@@ -582,6 +582,165 @@ class WebAutomation:
             import traceback
             traceback.print_exc()
     
+    def force_punch(self, label=""):
+        """強制打卡 - 直接執行打卡動作但會先確認狀態"""
+        print(f"🔨 強制打卡模式: {label}")
+        
+        # 檢查基本條件
+        if not Config.AUTO_CHECKIN_ENABLED:
+            print("⏸ 已停用自動打卡 (AUTO_CHECKIN_ENABLED=false)")
+            return False
+
+        if Config.is_skip_today():
+            print("⏸ 今天在請假日列表中，跳過打卡")
+            return False
+
+        today = datetime.datetime.today().weekday()
+        if today not in Config.WORK_DAYS:
+            print(f"⏸ 今天不是工作日，跳過 {label}")
+            return False
+
+        # 獲取當天的打卡記錄來判斷當前狀態
+        attendance_records = AttendanceParser.get_today_attendance_records(self.driver)
+        current_status = AttendanceParser.get_current_status(attendance_records)
+        
+        print(f"📊 當前打卡狀態: {current_status}")
+        print(f"📝 打卡記錄數量: {len(attendance_records)}")
+        
+        # 顯示打卡記錄
+        if attendance_records:
+            print("📋 今日打卡記錄:")
+            for i, record in enumerate(attendance_records, 1):
+                check_in = record.get('check_in', 'N/A')
+                check_out = record.get('check_out', 'N/A')
+                print(f"  第 {i} 次: Check in={check_in}, Check out={check_out}")
+        
+        # 查找打卡按鈕
+        buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(),'Check in') or contains(text(),'Check out')]")
+        if not buttons:
+            print("❌ 找不到打卡按鈕")
+            return False
+        
+        btn = buttons[0]
+        btn_text = btn.text.strip()
+        print(f"🔘 找到按鈕: {btn_text}")
+        
+        # 狀態確認
+        print(f"\n🔍 狀態確認:")
+        print(f"   當前狀態: {current_status}")
+        print(f"   按鈕文字: {btn_text}")
+        print(f"   要執行的動作: {label}")
+        
+        # 檢查狀態是否合理
+        status_valid = False
+        if label == "上班":
+            if current_status == "not_checked_in" and "Check in" in btn_text:
+                status_valid = True
+                print("   ✅ 狀態合理: 未打卡 → 上班打卡")
+            else:
+                print(f"   ⚠️ 狀態可能不合理: 當前狀態={current_status}, 按鈕={btn_text}")
+                
+        elif label == "午休下班":
+            if current_status == "checked_in" and "Check out" in btn_text:
+                status_valid = True
+                print("   ✅ 狀態合理: 已上班 → 午休下班")
+            else:
+                print(f"   ⚠️ 狀態可能不合理: 當前狀態={current_status}, 按鈕={btn_text}")
+                
+        elif label == "午休上班":
+            if current_status == "checked_out" and "Check in" in btn_text:
+                status_valid = True
+                print("   ✅ 狀態合理: 已下班 → 午休上班")
+            else:
+                print(f"   ⚠️ 狀態可能不合理: 當前狀態={current_status}, 按鈕={btn_text}")
+                
+        elif label == "下班":
+            if current_status == "checked_in" and "Check out" in btn_text:
+                status_valid = True
+                print("   ✅ 狀態合理: 已上班 → 下班打卡")
+                
+                # 對於下班打卡，檢查工時
+                if attendance_records:
+                    total_work_hours = 0
+                    current_work_hours = 0
+                    now = datetime.datetime.now()
+                    
+                    for record in attendance_records:
+                        check_in = record.get('check_in', 'N/A')
+                        check_out = record.get('check_out', 'N/A')
+                        
+                        if check_in != 'N/A' and check_out != 'N/A' and check_out:
+                            # 已完成的工時段
+                            try:
+                                in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                                out_time = datetime.datetime.strptime(check_out, "%H:%M").time()
+                                today = datetime.datetime.now().date()
+                                in_datetime = datetime.datetime.combine(today, in_time)
+                                out_datetime = datetime.datetime.combine(today, out_time)
+                                duration = out_datetime - in_datetime
+                                hours = duration.total_seconds() / 3600
+                                total_work_hours += hours
+                            except Exception as e:
+                                print(f"   ⚠️ 工時計算失敗: {e}")
+                        elif check_in != 'N/A' and check_out == '':
+                            # 正在進行的工時段
+                            try:
+                                in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                                today = datetime.datetime.now().date()
+                                in_datetime = datetime.datetime.combine(today, in_time)
+                                duration = now - in_datetime
+                                hours = duration.total_seconds() / 3600
+                                current_work_hours = hours
+                            except Exception as e:
+                                print(f"   ⚠️ 當前工時計算失敗: {e}")
+                    
+                    total_work_hours += current_work_hours
+                    print(f"   📊 總工時: {total_work_hours:.2f} 小時")
+                    
+                    if total_work_hours < 8:
+                        print(f"   ⚠️ 工時不足 ({total_work_hours:.2f}小時 < 8小時)")
+                        remaining_hours = 8 - total_work_hours
+                        remaining_minutes = int(remaining_hours * 60)
+                        print(f"   💡 還需要工作: {remaining_minutes} 分鐘")
+                    else:
+                        print(f"   ✅ 工時充足 ({total_work_hours:.2f}小時 >= 8小時)")
+            else:
+                print(f"   ⚠️ 狀態可能不合理: 當前狀態={current_status}, 按鈕={btn_text}")
+        
+        # 詢問是否繼續
+        if not status_valid:
+            print(f"\n⚠️ 警告: 狀態可能不合理，但將繼續執行 {label} 打卡")
+        
+        print(f"\n🚀 執行 {label} 打卡...")
+        
+        try:
+            # 執行打卡
+            btn.click()
+            print(f"✅ {label} 打卡成功")
+            
+            # 更新上班時間（如果是上班打卡）
+            if label == "上班":
+                self.work_start_time = datetime.datetime.now()
+                print(f"🕘 更新上班時間: {self.work_start_time}")
+            
+            # 發送通知
+            EmailService.send_checkin_notification(
+                f"{label} 打卡成功", 
+                label, 
+                source="強制打卡"
+            )
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ {label} 打卡失敗: {e}")
+            EmailService.send_checkin_notification(
+                f"{label} 打卡失敗: {e}", 
+                label, 
+                source="強制打卡"
+            )
+            return False
+
     def quit(self):
         """關閉瀏覽器"""
         if self.driver:

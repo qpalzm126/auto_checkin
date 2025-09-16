@@ -20,6 +20,7 @@ def main():
     print("   - 使用 'python main.py debug' 來調試 HTML 結構")
     print("   - 使用 'python main.py email' 來測試寄信功能")
     print("   - 使用 'python main.py hours' 來計算今天滿8小時的下班時間")
+    print("   - 使用 'python main.py force <動作>' 來強制打卡")
 
     # 顯示當前時間資訊
     current_time = datetime.datetime.now()
@@ -150,6 +151,40 @@ def calculate_work_hours_mode():
         automation.quit()
 
 
+def force_punch_mode():
+    """強制打卡模式"""
+    if len(sys.argv) < 3:
+        print("❌ 請指定打卡動作")
+        print("💡 用法: python main.py force <動作>")
+        print("   可用動作: 上班, 午休下班, 午休上班, 下班")
+        return
+    
+    action = sys.argv[2]
+    valid_actions = ["上班", "午休下班", "午休上班", "下班"]
+    
+    if action not in valid_actions:
+        print(f"❌ 無效的打卡動作: {action}")
+        print(f"💡 可用動作: {', '.join(valid_actions)}")
+        return
+    
+    automation = WebAutomation()
+    try:
+        automation.setup_driver()
+        if automation.login():
+            print(f"✅ 登入成功，開始強制打卡: {action}")
+            success = automation.force_punch(action)
+            if success:
+                print(f"🎉 {action} 打卡完成")
+            else:
+                print(f"❌ {action} 打卡失敗")
+        else:
+            print("❌ 登入失敗，無法執行強制打卡")
+    except Exception as e:
+        print(f"❌ 強制打卡過程出錯: {e}")
+    finally:
+        automation.quit()
+
+
 if __name__ == "__main__":
     # 檢查是否為測試模式
     if len(sys.argv) > 1:
@@ -161,7 +196,9 @@ if __name__ == "__main__":
             email_test_mode()
         elif sys.argv[1] == "hours":
             calculate_work_hours_mode()
+        elif sys.argv[1] == "force":
+            force_punch_mode()
         else:
-            print("❌ 未知的參數。可用參數: test, debug, email, hours")
+            print("❌ 未知的參數。可用參數: test, debug, email, hours, force")
     else:
         main()
