@@ -154,7 +154,7 @@ class WebAutomation:
                     result = f"午休下班打卡 - 當前狀態: {current_status}，按鈕: {btn_text}，略過"
                     
             elif label == "午休上班":
-                if current_status == "checked_out" and "Check in" in btn_text:
+                if (current_status == "checked_out" or current_status == "not_checked_in") and "Check in" in btn_text:
                     should_punch = True
                     result = "午休上班打卡成功"
                 else:
@@ -648,9 +648,12 @@ class WebAutomation:
                 print(f"   ⚠️ 狀態可能不合理: 當前狀態={current_status}, 按鈕={btn_text}")
                 
         elif label == "午休上班":
-            if current_status == "checked_out" and "Check in" in btn_text:
+            if (current_status == "checked_out" or current_status == "not_checked_in") and "Check in" in btn_text:
                 status_valid = True
-                print("   ✅ 狀態合理: 已下班 → 午休上班")
+                if current_status == "checked_out":
+                    print("   ✅ 狀態合理: 已下班 → 午休上班")
+                else:
+                    print("   ✅ 狀態合理: 未打卡 → 午休上班")
             else:
                 print(f"   ⚠️ 狀態可能不合理: 當前狀態={current_status}, 按鈕={btn_text}")
                 

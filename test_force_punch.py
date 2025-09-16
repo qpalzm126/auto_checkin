@@ -48,9 +48,16 @@ def test_force_punch_logic():
             "expected_valid": True
         },
         {
-            "name": "午休上班 - 狀態合理",
+            "name": "午休上班 - 狀態合理 (已下班)",
             "action": "午休上班",
             "current_status": "checked_out",
+            "button_text": "Check in",
+            "expected_valid": True
+        },
+        {
+            "name": "午休上班 - 狀態合理 (未打卡)",
+            "action": "午休上班",
+            "current_status": "not_checked_in",
             "button_text": "Check in",
             "expected_valid": True
         }
@@ -71,7 +78,7 @@ def test_force_punch_logic():
             if case['current_status'] == "checked_in" and "Check out" in case['button_text']:
                 status_valid = True
         elif case['action'] == "午休上班":
-            if case['current_status'] == "checked_out" and "Check in" in case['button_text']:
+            if (case['current_status'] == "checked_out" or case['current_status'] == "not_checked_in") and "Check in" in case['button_text']:
                 status_valid = True
         elif case['action'] == "下班":
             if case['current_status'] == "checked_in" and "Check out" in case['button_text']:
