@@ -744,6 +744,199 @@ class WebAutomation:
             )
             return False
 
+    def auto_checkout_when_ready(self):
+        """自動偵測下班時間並在滿8小時後打卡下班"""
+        print("🕐 開始偵測下班時間...")
+        
+        # 檢查基本條件
+        if not Config.AUTO_CHECKIN_ENABLED:
+            print("⏸ 已停用自動打卡 (AUTO_CHECKIN_ENABLED=false)")
+            return False
+
+        if Config.is_skip_today():
+            print("⏸ 今天在請假日列表中，跳過打卡")
+            return False
+
+        today = datetime.datetime.today().weekday()
+        if today not in Config.WORK_DAYS:
+            print(f"⏸ 今天不是工作日，跳過打卡")
+            return False
+
+        try:
+            # 獲取當天的打卡記錄
+            attendance_records = AttendanceParser.get_today_attendance_records(self.driver)
+            current_status = AttendanceParser.get_current_status(attendance_records)
+            
+            print(f"📊 當前打卡狀態: {current_status}")
+            print(f"📝 打卡記錄數量: {len(attendance_records)}")
+            
+            # 顯示打卡記錄
+            if attendance_records:
+                print("📋 今日打卡記錄:")
+                for i, record in enumerate(attendance_records, 1):
+                    check_in = record.get('check_in', 'N/A')
+                    check_out = record.get('check_out', 'N/A')
+                    print(f"  第 {i} 次: Check in={check_in}, Check out={check_out}")
+            
+            # 檢查是否正在上班
+            if current_status != "checked_in":
+                print(f"⚠️ 當前狀態不是 'checked_in'，無法執行自動下班打卡")
+                print(f"   當前狀態: {current_status}")
+                return False
+            
+            # 計算當前工時
+            now = datetime.datetime.now()
+            total_work_hours = 0
+            current_work_hours = 0
+            
+            for record in attendance_records:
+                check_in = record.get('check_in', 'N/A')
+                check_out = record.get('check_out', 'N/A')
+                
+                if check_in != 'N/A' and check_out != 'N/A' and check_out:
+                    # 已完成的工時段
+                    try:
+                        in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                        out_time = datetime.datetime.strptime(check_out, "%H:%M").time()
+                        today = datetime.datetime.now().date()
+                        in_datetime = datetime.datetime.combine(today, in_time)
+                        out_datetime = datetime.datetime.combine(today, out_time)
+                        duration = out_datetime - in_datetime
+                        hours = duration.total_seconds() / 3600
+                        total_work_hours += hours
+                        print(f"  ✅ 已完成工時段: {check_in}-{check_out} = {hours:.2f}小時")
+                    except Exception as e:
+                        print(f"  ⚠️ 工時計算失敗: {e}")
+                elif check_in != 'N/A' and check_out == '':
+                    # 正在進行的工時段
+                    try:
+                        in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                        today = datetime.datetime.now().date()
+                        in_datetime = datetime.datetime.combine(today, in_time)
+                        duration = now - in_datetime
+                        hours = duration.total_seconds() / 3600
+                        current_work_hours = hours
+                        print(f"  🔄 正在進行工時段: {check_in}-現在 = {hours:.2f}小時")
+                    except Exception as e:
+                        print(f"  ⚠️ 當前工時計算失敗: {e}")
+            
+            # 總工時
+            total_work_hours += current_work_hours
+            print(f"\n📊 總工時: {total_work_hours:.2f} 小時")
+            
+            # 檢查是否已經滿8小時
+            if total_work_hours >= 8:
+                print("🎉 已經滿8小時了！可以立即下班打卡")
+                
+                # 查找下班按鈕
+                buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(),'Check out')]")
+                if not buttons:
+                    print("❌ 找不到下班按鈕")
+                    return False
+                
+                btn = buttons[0]
+                print(f"🔘 找到下班按鈕: {btn.text.strip()}")
+                
+                # 執行下班打卡
+                try:
+                    btn.click()
+                    print("✅ 下班打卡成功！")
+                    
+                    # 發送通知
+                    EmailService.send_checkin_notification(
+                        f"自動下班打卡成功 (工時: {total_work_hours:.2f}小時)", 
+                        "下班", 
+                        work_hours=total_work_hours,
+                        source="自動下班偵測"
+                    )
+                    
+                    return True
+                except Exception as e:
+                    print(f"❌ 下班打卡失敗: {e}")
+                    return False
+            else:
+                # 計算還需要多少時間
+                remaining_hours = 8 - total_work_hours
+                remaining_minutes = int(remaining_hours * 60)
+                print(f"⏰ 還需要工作: {remaining_minutes} 分鐘 ({remaining_hours:.2f} 小時)")
+                
+                # 計算下班時間
+                checkout_time = now + datetime.timedelta(hours=remaining_hours)
+                print(f"🕐 預計下班時間: {checkout_time.strftime('%H:%M:%S')}")
+                
+                # 計算等待時間（滿8小時後再等1分鐘）
+                wait_time = remaining_hours + (1/60)  # 加1分鐘
+                wait_minutes = int(wait_time * 60)
+                target_time = now + datetime.timedelta(minutes=wait_minutes)
+                
+                print(f"⏳ 將在 {target_time.strftime('%H:%M:%S')} 自動執行下班打卡")
+                print(f"   等待時間: {wait_minutes} 分鐘")
+                
+                # 發送通知
+                EmailService.send_checkin_notification(
+                    f"自動下班偵測啟動 - 將在 {target_time.strftime('%H:%M')} 自動打卡下班", 
+                    "下班偵測", 
+                    work_hours=total_work_hours,
+                    source="自動下班偵測"
+                )
+                
+                # 等待到目標時間
+                print(f"\n⏰ 開始等待... (按 Ctrl+C 取消)")
+                try:
+                    import time
+                    while datetime.datetime.now() < target_time:
+                        time.sleep(30)  # 每30秒檢查一次
+                        remaining = target_time - datetime.datetime.now()
+                        if remaining.total_seconds() > 0:
+                            remaining_min = int(remaining.total_seconds() / 60)
+                            remaining_sec = int(remaining.total_seconds() % 60)
+                            print(f"⏳ 還需要等待: {remaining_min}分{remaining_sec}秒")
+                    
+                    print(f"\n🚀 時間到了！開始執行下班打卡...")
+                    
+                    # 重新獲取最新狀態
+                    attendance_records = AttendanceParser.get_today_attendance_records(self.driver)
+                    current_status = AttendanceParser.get_current_status(attendance_records)
+                    
+                    if current_status != "checked_in":
+                        print(f"⚠️ 狀態已改變: {current_status}，無法執行下班打卡")
+                        return False
+                    
+                    # 查找下班按鈕
+                    buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(),'Check out')]")
+                    if not buttons:
+                        print("❌ 找不到下班按鈕")
+                        return False
+                    
+                    btn = buttons[0]
+                    print(f"🔘 找到下班按鈕: {btn.text.strip()}")
+                    
+                    # 執行下班打卡
+                    btn.click()
+                    print("✅ 自動下班打卡成功！")
+                    
+                    # 發送成功通知
+                    EmailService.send_checkin_notification(
+                        f"自動下班打卡成功！", 
+                        "下班", 
+                        source="自動下班偵測"
+                    )
+                    
+                    return True
+                    
+                except KeyboardInterrupt:
+                    print("\n⏸ 用戶取消等待")
+                    return False
+                except Exception as e:
+                    print(f"❌ 等待過程出錯: {e}")
+                    return False
+                    
+        except Exception as e:
+            print(f"❌ 自動下班偵測失敗: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
     def quit(self):
         """關閉瀏覽器"""
         if self.driver:

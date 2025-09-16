@@ -21,6 +21,7 @@ def main():
     print("   - 使用 'python main.py email' 來測試寄信功能")
     print("   - 使用 'python main.py hours' 來計算今天滿8小時的下班時間")
     print("   - 使用 'python main.py force <動作>' 來強制打卡")
+    print("   - 使用 'python main.py auto' 來自動偵測下班時間並打卡")
 
     # 顯示當前時間資訊
     current_time = datetime.datetime.now()
@@ -185,6 +186,26 @@ def force_punch_mode():
         automation.quit()
 
 
+def auto_checkout_mode():
+    """自動下班偵測模式"""
+    automation = WebAutomation()
+    try:
+        automation.setup_driver()
+        if automation.login():
+            print("✅ 登入成功，開始自動下班偵測...")
+            success = automation.auto_checkout_when_ready()
+            if success:
+                print("🎉 自動下班打卡完成")
+            else:
+                print("❌ 自動下班打卡失敗")
+        else:
+            print("❌ 登入失敗，無法執行自動下班偵測")
+    except Exception as e:
+        print(f"❌ 自動下班偵測過程出錯: {e}")
+    finally:
+        automation.quit()
+
+
 if __name__ == "__main__":
     # 檢查是否為測試模式
     if len(sys.argv) > 1:
@@ -198,7 +219,9 @@ if __name__ == "__main__":
             calculate_work_hours_mode()
         elif sys.argv[1] == "force":
             force_punch_mode()
+        elif sys.argv[1] == "auto":
+            auto_checkout_mode()
         else:
-            print("❌ 未知的參數。可用參數: test, debug, email, hours, force")
+            print("❌ 未知的參數。可用參數: test, debug, email, hours, force, auto")
     else:
         main()
