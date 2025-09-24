@@ -31,36 +31,62 @@ class WebAutomation:
         self.driver = webdriver.Chrome(options=chrome_options)
         return self.driver
     
-    def login(self):
-        """登入系統"""
-        try:
-            print("🌐 正在連接網站...")
-            self.driver.get(Config.LOGIN_URL)
-            
-            print("🔐 正在登入...")
-            self.driver.find_element(By.ID, "__BVID__6").send_keys(Config.USERNAME)
-            self.driver.find_element(By.ID, "__BVID__8").send_keys(Config.PASSWORD)
-            self.driver.find_element(By.XPATH, "//button[contains(text(),'Log In')]").click()
-            time.sleep(3)
-            
-            # 檢查是否登入成功 - 檢查頁面是否包含打卡相關元素
+    def login(self, max_retries=2):
+        """登入系統，支援重試機制"""
+        for attempt in range(max_retries + 1):
             try:
-                # 檢查是否有打卡按鈕或相關元素
-                check_buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(),'Check')]")
-                if check_buttons:
-                    print("✅ 登入成功 - 找到打卡按鈕")
-                    return True
+                if attempt > 0:
+                    print(f"🔄 第 {attempt + 1} 次登入嘗試...")
+                    time.sleep(5)  # 重試前等待5秒
+                else:
+                    print("🌐 正在連接網站...")
                 
-                print("❌ 登入失敗 - 未找到登入成功指標")
-                return False
+                self.driver.get(Config.LOGIN_URL)
                 
+                print("🔐 正在登入...")
+                self.driver.find_element(By.ID, "__BVID__6").send_keys(Config.USERNAME)
+                self.driver.find_element(By.ID, "__BVID__8").send_keys(Config.PASSWORD)
+                self.driver.find_element(By.XPATH, "//button[contains(text(),'Log In')]").click()
+                time.sleep(3)
+                
+                # 檢查是否登入成功 - 檢查頁面是否包含打卡相關元素
+                try:
+                    # 檢查是否有打卡按鈕或相關元素
+                    check_buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(),'Check')]")
+                    if check_buttons:
+                        if attempt > 0:
+                            print(f"✅ 登入成功 - 第 {attempt + 1} 次嘗試成功，找到打卡按鈕")
+                        else:
+                            print("✅ 登入成功 - 找到打卡按鈕")
+                        return True
+                    
+                    print(f"❌ 登入失敗 - 第 {attempt + 1} 次嘗試，未找到登入成功指標")
+                    
+                    # 如果不是最後一次嘗試，繼續重試
+                    if attempt < max_retries:
+                        print(f"⏳ 等待5秒後重試...")
+                        continue
+                    else:
+                        print("❌ 所有登入嘗試都失敗了")
+                        return False
+                    
+                except Exception as e:
+                    print(f"❌ 檢查登入狀態時出錯: {e}")
+                    if attempt < max_retries:
+                        print(f"⏳ 等待5秒後重試...")
+                        continue
+                    else:
+                        return False
+                    
             except Exception as e:
-                print(f"❌ 檢查登入狀態時出錯: {e}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ 登入過程出錯: {e}")
-            return False
+                print(f"❌ 登入過程出錯: {e}")
+                if attempt < max_retries:
+                    print(f"⏳ 等待5秒後重試...")
+                    continue
+                else:
+                    return False
+        
+        return False
     
     def punch_in(self, label=""):
         """執行打卡動作"""
