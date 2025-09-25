@@ -191,11 +191,17 @@ class WebAutomation:
                     # 檢查工時 - 使用正確的總工時計算
                     now = datetime.datetime.now()
                     
+                    # 重新獲取最新的打卡記錄來計算工時
+                    print("🔄 重新獲取最新打卡記錄進行工時計算...")
+                    latest_records = AttendanceParser.get_today_attendance_records(self.driver)
+                    print(f"📊 最新打卡記錄數量: {len(latest_records)}")
+                    
                     # 計算當天總工時
                     total_work_hours = 0
                     current_work_hours = 0
                     
-                    for record in attendance_records:
+                    print("📝 詳細工時計算:")
+                    for record in latest_records:
                         check_in = record.get('check_in', 'N/A')
                         check_out = record.get('check_out', 'N/A')
                         
@@ -210,8 +216,9 @@ class WebAutomation:
                                 duration = out_datetime - in_datetime
                                 hours = duration.total_seconds() / 3600
                                 total_work_hours += hours
+                                print(f"  ✅ 已完成工時段: {check_in}-{check_out} = {hours:.2f}小時")
                             except Exception as e:
-                                print(f"⚠️ 工時計算失敗: {e}")
+                                print(f"  ⚠️ 工時計算失敗: {e}")
                         elif check_in != 'N/A' and check_out == '':
                             # 正在進行的工時段
                             try:
@@ -221,8 +228,9 @@ class WebAutomation:
                                 duration = now - in_datetime
                                 hours = duration.total_seconds() / 3600
                                 current_work_hours = hours
+                                print(f"  🔄 正在進行工時段: {check_in}-現在 = {hours:.2f}小時")
                             except Exception as e:
-                                print(f"⚠️ 當前工時計算失敗: {e}")
+                                print(f"  ⚠️ 當前工時計算失敗: {e}")
                     
                     # 總工時 = 已完成的工時 + 當前正在進行的工時
                     total_work_hours += current_work_hours
