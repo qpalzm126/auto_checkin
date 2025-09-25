@@ -188,54 +188,17 @@ class WebAutomation:
                     
             elif label == "下班":
                 if current_status == "checked_in" and "Check out" in btn_text:
-                    # 檢查工時 - 使用正確的總工時計算
-                    now = datetime.datetime.now()
+                    # 檢查工時 - 使用 calculate_work_hours 函數
+                    print("🔄 使用 calculate_work_hours 函數計算工時...")
                     
-                    # 重新獲取最新的打卡記錄來計算工時
-                    print("🔄 重新獲取最新打卡記錄進行工時計算...")
-                    latest_records = AttendanceParser.get_today_attendance_records(self.driver)
-                    print(f"📊 最新打卡記錄數量: {len(latest_records)}")
+                    # 調用 calculate_work_hours 函數來計算工時
+                    work_hours_result = self._calculate_work_hours_for_punch()
                     
-                    # 計算當天總工時
-                    total_work_hours = 0
-                    current_work_hours = 0
+                    if work_hours_result is None:
+                        print("❌ 工時計算失敗，無法執行下班打卡")
+                        return
                     
-                    print("📝 詳細工時計算:")
-                    for record in latest_records:
-                        check_in = record.get('check_in', 'N/A')
-                        check_out = record.get('check_out', 'N/A')
-                        
-                        if check_in != 'N/A' and check_out != 'N/A' and check_out:
-                            # 已完成的工時段
-                            try:
-                                in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
-                                out_time = datetime.datetime.strptime(check_out, "%H:%M").time()
-                                today = datetime.datetime.now().date()
-                                in_datetime = datetime.datetime.combine(today, in_time)
-                                out_datetime = datetime.datetime.combine(today, out_time)
-                                duration = out_datetime - in_datetime
-                                hours = duration.total_seconds() / 3600
-                                total_work_hours += hours
-                                print(f"  ✅ 已完成工時段: {check_in}-{check_out} = {hours:.2f}小時")
-                            except Exception as e:
-                                print(f"  ⚠️ 工時計算失敗: {e}")
-                        elif check_in != 'N/A' and check_out == '':
-                            # 正在進行的工時段
-                            try:
-                                in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
-                                today = datetime.datetime.now().date()
-                                in_datetime = datetime.datetime.combine(today, in_time)
-                                duration = now - in_datetime
-                                hours = duration.total_seconds() / 3600
-                                current_work_hours = hours
-                                print(f"  🔄 正在進行工時段: {check_in}-現在 = {hours:.2f}小時")
-                            except Exception as e:
-                                print(f"  ⚠️ 當前工時計算失敗: {e}")
-                    
-                    # 總工時 = 已完成的工時 + 當前正在進行的工時
-                    total_work_hours += current_work_hours
-                    
-                    print(f"🕐 工時檢查: 已完成工時={total_work_hours - current_work_hours:.1f}小時, 當前工時={current_work_hours:.1f}小時, 總工時={total_work_hours:.1f}小時")
+                    total_work_hours, current_work_hours = work_hours_result
                     
                     if total_work_hours < 8:
                         # 在 GitHub Actions 環境中，發送郵件通知而不是延後
@@ -257,6 +220,7 @@ class WebAutomation:
                         else:
                             # 本地環境：延後打卡
                             delay_minutes = int((8 - total_work_hours) * 60) + 1
+                            now = datetime.datetime.now()
                             new_time = now + datetime.timedelta(minutes=delay_minutes)
                             print(f"⏳ 未滿 8 小時，延後到 {new_time.strftime('%H:%M')} 下班打卡")
                             schedule.every().day.at(new_time.strftime("%H:%M")).do(self.punch_in, label="下班")
@@ -511,6 +475,65 @@ class WebAutomation:
                 self.driver.quit()
             print("✅ 調試完成")
     
+    def _calculate_work_hours_for_punch(self):
+        """為打卡計算工時，返回 (total_work_hours, current_work_hours) 或 None"""
+        try:
+            print("🧮 開始計算工時...")
+            
+            # 獲取當天的打卡記錄
+            attendance_records = AttendanceParser.get_today_attendance_records(self.driver)
+            print(f"📊 打卡記錄數量: {len(attendance_records)}")
+            
+            if not attendance_records:
+                print("❌ 沒有找到今天的打卡記錄")
+                return None
+            
+            # 計算工時
+            total_work_hours = 0
+            current_work_hours = 0  # 當前正在進行的工時
+            now = datetime.datetime.now()
+            
+            for i, record in enumerate(attendance_records, 1):
+                check_in = record.get('check_in', 'N/A')
+                check_out = record.get('check_out', 'N/A')
+                
+                # 計算這段的工時
+                if check_in != 'N/A' and check_out != 'N/A' and check_out:
+                    # 已完成的工時段
+                    try:
+                        in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                        out_time = datetime.datetime.strptime(check_out, "%H:%M").time()
+                        today = datetime.datetime.now().date()
+                        in_datetime = datetime.datetime.combine(today, in_time)
+                        out_datetime = datetime.datetime.combine(today, out_time)
+                        duration = out_datetime - in_datetime
+                        hours = duration.total_seconds() / 3600
+                        total_work_hours += hours
+                    except Exception as e:
+                        print(f"⚠️ 工時計算失敗: {e}")
+                elif check_in != 'N/A' and check_out == '':
+                    # 正在進行的工時段
+                    try:
+                        in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                        today = datetime.datetime.now().date()
+                        in_datetime = datetime.datetime.combine(today, in_time)
+                        duration = now - in_datetime
+                        hours = duration.total_seconds() / 3600
+                        current_work_hours = hours
+                    except Exception as e:
+                        print(f"⚠️ 當前工時計算失敗: {e}")
+            
+            # 總工時 = 已完成的工時 + 當前正在進行的工時
+            total_work_hours += current_work_hours
+            
+            print(f"📊 工時計算結果: 已完成工時={total_work_hours - current_work_hours:.1f}小時, 當前工時={current_work_hours:.1f}小時, 總工時={total_work_hours:.1f}小時")
+            
+            return (total_work_hours, current_work_hours)
+            
+        except Exception as e:
+            print(f"❌ 計算工時失敗: {e}")
+            return None
+
     def calculate_work_hours(self):
         """計算今天滿8小時工時需要什麼時候下班"""
         try:
