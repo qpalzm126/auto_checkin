@@ -115,7 +115,7 @@ def setup_schedule():
     schedule.every().day.at("08:45").do(lambda: run_checkin("上班", source="本地環境"))
     schedule.every().day.at("12:00").do(lambda: run_checkin("午休下班", source="本地環境"))
     schedule.every().day.at("12:58").do(lambda: run_checkin("午休上班", source="本地環境"))
-    schedule.every().day.at("17:55").do(lambda: run_checkin("下班", source="本地環境"))
+    schedule.every().day.at("18:15").do(lambda: run_checkin("下班", source="本地環境"))
     print("✅ 排程設置完成")
 
 
