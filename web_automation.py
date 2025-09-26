@@ -150,7 +150,8 @@ class WebAutomation:
             EmailService.send_checkin_notification(
                 "找不到打卡按鈕", 
                 label, 
-                source="系統檢查"
+                source="系統檢查",
+                attendance_records=attendance_records
             )
             self.driver.quit()
             return
@@ -212,7 +213,8 @@ class WebAutomation:
                                 f"工時不足 ({total_work_hours:.1f}小時)，需要再工作 {remaining_minutes} 分鐘", 
                                 "下班打卡 - 工時不足", 
                                 work_hours=total_work_hours,
-                                source="GitHub Actions 工時檢查"
+                                source="GitHub Actions 工時檢查",
+                                attendance_records=attendance_records
                             )
                             result = f"工時不足 ({total_work_hours:.1f}小時)，已發送通知郵件"
                             self.driver.quit()
@@ -257,7 +259,8 @@ class WebAutomation:
         EmailService.send_checkin_notification(
             result, 
             label, 
-            source="打卡系統"
+            source="打卡系統",
+            attendance_records=attendance_records
         )
 
         print(f"📌 {label} 完成: {result}")
@@ -488,7 +491,7 @@ class WebAutomation:
                 print("❌ 沒有找到今天的打卡記錄")
                 return None
             
-            # 計算工時
+            # 計算工時 - 使用與 calculate_work_hours 相同的邏輯
             total_work_hours = 0
             current_work_hours = 0  # 當前正在進行的工時
             now = datetime.datetime.now()
@@ -522,6 +525,7 @@ class WebAutomation:
                         current_work_hours = hours
                     except Exception as e:
                         print(f"⚠️ 當前工時計算失敗: {e}")
+                        current_work_hours = 0
             
             # 總工時 = 已完成的工時 + 當前正在進行的工時
             total_work_hours += current_work_hours
@@ -587,6 +591,7 @@ class WebAutomation:
                         print(f"    工時: {hours:.2f} 小時 (進行中)")
                     except Exception as e:
                         print(f"    當前工時計算失敗: {e}")
+                        current_work_hours = 0
             
             # 總工時 = 已完成的工時 + 當前正在進行的工時
             total_work_hours += current_work_hours
@@ -787,7 +792,8 @@ class WebAutomation:
             EmailService.send_checkin_notification(
                 f"{label} 打卡成功", 
                 label, 
-                source="強制打卡"
+                source="強制打卡",
+                attendance_records=attendance_records
             )
             
             return True
@@ -904,7 +910,8 @@ class WebAutomation:
                         f"自動下班打卡成功 (工時: {total_work_hours:.2f}小時)", 
                         "下班", 
                         work_hours=total_work_hours,
-                        source="自動下班偵測"
+                        source="自動下班偵測",
+                        attendance_records=attendance_records
                     )
                     
                     return True
@@ -934,7 +941,8 @@ class WebAutomation:
                     f"自動下班偵測啟動 - 將在 {target_time.strftime('%H:%M')} 自動打卡下班", 
                     "下班偵測", 
                     work_hours=total_work_hours,
-                    source="自動下班偵測"
+                    source="自動下班偵測",
+                    attendance_records=attendance_records
                 )
                 
                 # 等待到目標時間
@@ -976,7 +984,8 @@ class WebAutomation:
                     EmailService.send_checkin_notification(
                         f"自動下班打卡成功！", 
                         "下班", 
-                        source="自動下班偵測"
+                        source="自動下班偵測",
+                        attendance_records=attendance_records
                     )
                     
                     return True

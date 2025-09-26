@@ -123,7 +123,7 @@ class EmailService:
             return False
 
     @staticmethod
-    def send_checkin_notification(result, label, work_hours=None, source=None):
+    def send_checkin_notification(result, label, work_hours=None, source=None, attendance_records=None):
         """發送打卡通知郵件"""
         # 在 GitHub Actions 環境中顯示台灣時間，本地環境顯示本地時間
         if os.getenv("GITHUB_ACTIONS"):
@@ -159,6 +159,16 @@ class EmailService:
 
         if work_hours is not None:
             body += f"工時: {work_hours:.2f} 小時\n"
+
+        # 添加打卡記錄
+        if attendance_records:
+            body += f"\n📊 當天打卡記錄:\n"
+            for i, record in enumerate(attendance_records, 1):
+                check_in = record.get('check_in', 'N/A')
+                check_out = record.get('check_out', 'N/A')
+                if check_out == '':
+                    check_out = '進行中'
+                body += f"  記錄 {i}: {check_in} - {check_out}\n"
 
         body += f"""
 環境: {'GitHub Actions' if os.getenv('GITHUB_ACTIONS') else '本地環境'}
