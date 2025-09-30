@@ -491,14 +491,26 @@ class WebAutomation:
                 print("❌ 沒有找到今天的打卡記錄")
                 return None
             
-            # 計算工時 - 使用與 calculate_work_hours 相同的邏輯
+            # 計算工時 - 使用與 calculate_work_hours 完全相同的邏輯
             total_work_hours = 0
             current_work_hours = 0  # 當前正在進行的工時
-            now = datetime.datetime.now()
+            
+            # 在 GitHub Actions 環境中使用台灣時間
+            if os.getenv("GITHUB_ACTIONS"):
+                # GitHub Actions 使用 UTC 時間，台灣時間 = UTC + 8
+                now = datetime.datetime.now() + datetime.timedelta(hours=8)
+                print(f"🕐 當前時間 (台灣時間): {now.strftime('%H:%M:%S')}")
+            else:
+                now = datetime.datetime.now()
+                print(f"🕐 當前時間: {now.strftime('%H:%M:%S')}")
             
             for i, record in enumerate(attendance_records, 1):
                 check_in = record.get('check_in', 'N/A')
                 check_out = record.get('check_out', 'N/A')
+                
+                print(f"  第 {i} 次:")
+                print(f"    Check in:  {check_in}")
+                print(f"    Check out: {check_out}")
                 
                 # 計算這段的工時
                 if check_in != 'N/A' and check_out != 'N/A' and check_out:
@@ -512,8 +524,9 @@ class WebAutomation:
                         duration = out_datetime - in_datetime
                         hours = duration.total_seconds() / 3600
                         total_work_hours += hours
+                        print(f"    工時: {hours:.2f} 小時 (已完成)")
                     except Exception as e:
-                        print(f"⚠️ 工時計算失敗: {e}")
+                        print(f"    工時計算失敗: {e}")
                 elif check_in != 'N/A' and check_out == '':
                     # 正在進行的工時段
                     try:
@@ -523,14 +536,17 @@ class WebAutomation:
                         duration = now - in_datetime
                         hours = duration.total_seconds() / 3600
                         current_work_hours = hours
+                        print(f"    工時: {hours:.2f} 小時 (進行中)")
                     except Exception as e:
-                        print(f"⚠️ 當前工時計算失敗: {e}")
+                        print(f"    當前工時計算失敗: {e}")
                         current_work_hours = 0
             
             # 總工時 = 已完成的工時 + 當前正在進行的工時
             total_work_hours += current_work_hours
             
-            print(f"📊 工時計算結果: 已完成工時={total_work_hours - current_work_hours:.1f}小時, 當前工時={current_work_hours:.1f}小時, 總工時={total_work_hours:.1f}小時")
+            print(f"\n📊 已完成工時: {total_work_hours - current_work_hours:.2f} 小時")
+            print(f"📊 當前工時: {current_work_hours:.2f} 小時")
+            print(f"📊 總工時: {total_work_hours:.2f} 小時")
             
             return (total_work_hours, current_work_hours)
             
@@ -555,7 +571,15 @@ class WebAutomation:
             print("\n📝 今天的打卡記錄:")
             total_work_hours = 0
             current_work_hours = 0  # 當前正在進行的工時
-            now = datetime.datetime.now()
+            
+            # 在 GitHub Actions 環境中使用台灣時間
+            if os.getenv("GITHUB_ACTIONS"):
+                # GitHub Actions 使用 UTC 時間，台灣時間 = UTC + 8
+                now = datetime.datetime.now() + datetime.timedelta(hours=8)
+                print(f"🕐 當前時間 (台灣時間): {now.strftime('%H:%M:%S')}")
+            else:
+                now = datetime.datetime.now()
+                print(f"🕐 當前時間: {now.strftime('%H:%M:%S')}")
             
             for i, record in enumerate(attendance_records, 1):
                 check_in = record.get('check_in', 'N/A')
