@@ -2,8 +2,8 @@ name: Auto Check-in
 
 on:
   schedule:
-    # 台灣時間 08:30 上班打卡（UTC 00:30）
-    # - cron: "30 0 * * 1-5"
+    # 台灣時間 08:15 上班打卡（UTC 00:15）
+    - cron: '15 0 * * 1-5'
     # 台灣時間 11:50 午休下班（UTC 03:50）
     # - cron: "50 3 * * 1-5"
     # 台灣時間 12:50 午休上班（UTC 04:50）
@@ -11,7 +11,7 @@ on:
     # 台灣時間 17:40 下班打卡（UTC 09:40）
     # - cron: "40 9 * * 1-5"
     # 台灣時間 17:52  額外下班打卡時間（UTC 09:52）
-    - cron: "52 9 * * 1-5"
+    - cron: '52 9 * * 1-5'
   workflow_dispatch: # 手動觸發
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
