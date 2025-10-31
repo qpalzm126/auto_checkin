@@ -8,7 +8,9 @@ import datetime
 import schedule
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
 from config import Config
 from attendance_parser import AttendanceParser
 from email_service import EmailService
@@ -28,7 +30,9 @@ class WebAutomation:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         
-        self.driver = webdriver.Chrome(options=chrome_options)
+        # 使用 webdriver-manager 自動下載和管理 ChromeDriver
+        service = Service(ChromeDriverManager().install())
+        self.driver = webdriver.Chrome(service=service, options=chrome_options)
         return self.driver
     
     def login(self, max_retries=2):
