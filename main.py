@@ -96,7 +96,7 @@ def run_checkin(label, source=None):
 
 
 def setup_schedule():
-    """設置本地排程"""
+    """設置本地排程"""     
     # 檢查是否為工作日
     if not Config.is_workday():
         print("📅 今天不是工作日，跳過排程設置")
@@ -112,10 +112,10 @@ def setup_schedule():
         return
 
     print("⏰ 設置排程...")
-    schedule.every().day.at("08:45").do(lambda: run_checkin("上班", source="本地環境"))
-    schedule.every().day.at("12:00").do(lambda: run_checkin("午休下班", source="本地環境"))
-    schedule.every().day.at("12:59").do(lambda: run_checkin("午休上班", source="本地環境"))
-    schedule.every().day.at("18:10").do(lambda: run_checkin("下班", source="本地環境"))
+    schedule.every().day.at("08:50").do(lambda: run_checkin("上班", source="本地環境"))
+    schedule.every().day.at("12:15").do(lambda: run_checkin("午休下班", source="本地環境"))
+    schedule.every().day.at("13:15").do(lambda: run_checkin("午休上班", source="本地環境"))
+    schedule.every().day.at("18:15").do(lambda: run_checkin("下班", source="本地環境"))
     print("✅ 排程設置完成")
 
 
