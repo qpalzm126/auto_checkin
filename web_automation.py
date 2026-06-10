@@ -14,6 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from config import Config
 from attendance_parser import AttendanceParser
 from email_service import EmailService
+from telegram_service import TelegramService
 
 class WebAutomation:
     """網頁自動化類別"""
@@ -265,6 +266,18 @@ class WebAutomation:
             label, 
             source="打卡系統",
             attendance_records=attendance_records
+        )
+        
+        # Telegram 通知
+        check_out_time = "N/A"
+        if attendance_records and attendance_records[0].get('check_out'):
+            check_out_time = attendance_records[0]['check_out']
+        TelegramService.send_checkin_notification(
+            result,
+            label,
+            source="打卡系統",
+            check_in_time=check_in_time,
+            check_out_time=check_out_time,
         )
 
         print(f"📌 {label} 完成: {result}")

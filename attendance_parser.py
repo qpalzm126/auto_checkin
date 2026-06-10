@@ -179,23 +179,52 @@ class AttendanceParser:
         return status
 
     @staticmethod
-    def calculate_work_hours(records):
-        """計算總工時"""
+    def calculate_work_hours(records, include_in_progress=True):
+        """計算總工時
+
+        正確計算方式：將每筆 (check_out - check_in) 累加，這樣可以排除午休等
+        非工作時段。若 include_in_progress=True 且最後一筆只有 check_in 沒有
+        check_out（代表目前還在工作中），則把該段 (now - check_in) 也納入總工時。
+
+        Args:
+            records: 打卡記錄列表，每筆為 {'check_in': 'HH:MM', 'check_out': 'HH:MM' or ''}
+            include_in_progress: 是否將進行中的工時段（尚未 check out 的最後一筆）納入總計
+
+        Returns:
+            float: 總工時（小時）
+        """
         total_hours = 0
-        
+
+        # 與其他模組一致：GitHub Actions 環境內部時間為 UTC，需轉為台灣時間
+        if os.getenv("GITHUB_ACTIONS"):
+            now = datetime.datetime.now() + datetime.timedelta(hours=8)
+        else:
+            now = datetime.datetime.now()
+        today = now.date()
+
         for record in records:
             try:
-                if record['check_in'] and record['check_out']:
-                    in_time = datetime.datetime.strptime(record['check_in'], "%H:%M").time()
-                    out_time = datetime.datetime.strptime(record['check_out'], "%H:%M").time()
-                    today = datetime.datetime.now().date()
-                    in_datetime = datetime.datetime.combine(today, in_time)
+                check_in = record.get('check_in')
+                check_out = record.get('check_out')
+
+                if not check_in:
+                    continue
+
+                in_time = datetime.datetime.strptime(check_in, "%H:%M").time()
+                in_datetime = datetime.datetime.combine(today, in_time)
+
+                if check_out:
+                    out_time = datetime.datetime.strptime(check_out, "%H:%M").time()
                     out_datetime = datetime.datetime.combine(today, out_time)
                     duration = out_datetime - in_datetime
-                    hours = duration.total_seconds() / 3600
-                    total_hours += hours
+                    total_hours += duration.total_seconds() / 3600
+                elif include_in_progress:
+                    # 尚未下班的進行中工時段
+                    duration = now - in_datetime
+                    if duration.total_seconds() > 0:
+                        total_hours += duration.total_seconds() / 3600
             except Exception as e:
                 print(f"⚠️ 計算工時時出錯: {e}")
                 continue
-        
+
         return total_hours
